@@ -236,11 +236,15 @@ const SignUp = () => {
                   required={form.role === 'provider'}
                   value={form.serviceType}
                 >
-                  <option value="" disabled>Select specialty</option>
-                  <option value="plumbing">Plumbing</option>
-                  <option value="electrical">Electrical</option>
-                  <option value="cleaning">Cleaning</option>
-                  <option value="carpentry">Carpentry</option>
+                 <option value="" disabled selected>Select specialty</option>
+                 <option value="AC Service">AC Service</option>
+                 <option value="Appliance Repair">Appliance Repair</option>
+                 <option value="Carpentry">Carpentry</option>
+                 <option value="Deep Cleaning">Deep Cleaning</option>
+                 <option value="Electrical">Electrical</option>
+                 <option value="Home Safety">Home Safety</option>
+                 <option value="Pest Control">Pest Control</option>
+                 <option value="Plumbing">Plumbing</option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
               </motion.div>

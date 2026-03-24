@@ -1,337 +1,240 @@
-import React, { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useMemo, useState, useEffect } from 'react';
+import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowRight,
-  CalendarDays,
-  Clock3,
-  LogOut,
-  MapPin,
-  Paintbrush,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Wrench,
-  Zap,
+  ArrowRight, CalendarDays, Clock3, LogOut, MapPin, Paintbrush,
+  Search, ShieldCheck, Sparkles, Star, Wrench, Zap, LayoutDashboard,
+  Bell, ChevronRight, X, ArrowLeft, Loader2, Droplets, Hammer, Bug, Wind
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import LiveBackground from '../components/LiveBackground';
 
+// 1. CATEGORIES CONFIGURATION
 const categories = [
-  {
-    name: 'Deep Cleaning',
-    description: 'Home, office, move-in and recurring cleaning.',
-    icon: Paintbrush,
-    accent: 'from-cyan-400/30 via-cyan-400/10 to-transparent',
-  },
-  {
-    name: 'Electrical',
-    description: 'Fixtures, fan installs, diagnostics and rewiring.',
-    icon: Zap,
-    accent: 'from-amber-400/30 via-amber-400/10 to-transparent',
-  },
-  {
-    name: 'Appliance Repair',
-    description: 'Fast fixes for kitchens, laundry and home devices.',
-    icon: Wrench,
-    accent: 'from-rose-400/30 via-rose-400/10 to-transparent',
-  },
-  {
-    name: 'Home Safety',
-    description: 'Locksmith, CCTV, smoke alarm and access setup.',
-    icon: ShieldCheck,
-    accent: 'from-emerald-400/30 via-emerald-400/10 to-transparent',
-  },
-];
-
-const upcomingBookings = [
-  {
-    id: 1,
-    title: 'Kitchen deep clean',
-    provider: 'Shine Squad',
-    date: 'Today, 6:30 PM',
-    address: 'BTM Layout, Bangalore',
-    status: 'Arriving soon',
-  },
-  {
-    id: 2,
-    title: 'Washing machine repair',
-    provider: 'FixRight Services',
-    date: '18 Mar, 10:00 AM',
-    address: 'HSR Layout, Bangalore',
-    status: 'Confirmed',
-  },
-];
-
-const featuredPros = [
-  {
-    name: 'Aarav Electric Co.',
-    specialty: 'Certified electrical inspections',
-    rating: '4.9',
-    jobs: '1.2k jobs',
-  },
-  {
-    name: 'Urban Clean Lab',
-    specialty: 'Premium home and office detailing',
-    rating: '4.8',
-    jobs: '860 jobs',
-  },
-  {
-    name: 'SecureNest',
-    specialty: 'CCTV, smart lock and alarm setup',
-    rating: '4.9',
-    jobs: '540 jobs',
-  },
-];
-
-const quickStats = [
-  { label: 'Active bookings', value: '2' },
-  { label: 'Saved providers', value: '14' },
-  { label: 'Service credits', value: '₹1,200' },
+  { name: 'Deep Cleaning', icon: Paintbrush, accent: 'from-cyan-400/30', desc: 'Expert home & office detailing.' },
+  { name: 'Electrical', icon: Zap, accent: 'from-amber-400/30', desc: 'Diagnostics, wiring, and installs.' },
+  { name: 'Appliance Repair', icon: Wrench, accent: 'from-rose-400/30', desc: 'Fridge, Washer, and Gadget fixes.' },
+  { name: 'Plumbing', icon: Droplets, accent: 'from-blue-500/30', desc: 'Leak repairs and pipe fitting.' },
+  { name: 'Carpentry', icon: Hammer, accent: 'from-orange-500/30', desc: 'Furniture and custom woodwork.' },
+  { name: 'Pest Control', icon: Bug, accent: 'from-red-500/30', desc: 'Rodent and insect management.' },
+  { name: 'AC Service', icon: Wind, accent: 'from-sky-400/30', desc: 'AC Installation and gas charging.' },
+  { name: 'Home Safety', icon: ShieldCheck, accent: 'from-emerald-400/30', desc: 'CCTV and Smart Lock security.' },
 ];
 
 const CustomerDashboard = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  const [view, setView] = useState('home'); 
   const [searchTerm, setSearchTerm] = useState('');
+  const [providers, setProviders] = useState([]); 
+  const [loading, setLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [bookingProvider, setBookingProvider] = useState(null); 
 
-  const filteredCategories = useMemo(() => {
-    const normalized = searchTerm.trim().toLowerCase();
+  // 2. API: Fetching Providers by Specialty
+  useEffect(() => {
+    if (view === 'listing' && selectedCategory) {
+      setLoading(true);
+      const categoryForApi = selectedCategory.toLowerCase();
 
-    if (!normalized) return categories;
+      axios.get(`http://localhost:8080/api/providers/specialty/${categoryForApi}`)
+        .then(res => {
+          setProviders(res.data);
+          setLoading(false);
+        })
+        .catch(err => {
+          setLoading(false);
+          toast.error("Database connection failed.");
+        });
+    }
+  }, [view, selectedCategory]);
 
-    return categories.filter(({ name, description }) => {
-      return (
-        name.toLowerCase().includes(normalized) ||
-        description.toLowerCase().includes(normalized)
-      );
-    });
-  }, [searchTerm]);
+  // 3. FIXED API: Handling Booking Form Submission (Matches your SQL Schema)
+  // 3. FIXED API: Handling Booking Form Submission
+const handleBookingSubmit = async (e) => {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+
+  // ✅ Status constants (clean + reusable)
+  const BOOKING_STATUS = {
+    PENDING: 'PENDING',
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED'
+  };
+
+  const bookingDetails = {
+    userId: parseInt(user.id),
+    providerId: parseInt(bookingProvider.id),
+    serviceId: 1,
+    bookingDate: formData.get('date'),
+    description: formData.get('description'),
+    status: BOOKING_STATUS.PENDING   // ✅ FIXED HERE
+  };
+
+  try {
+    await axios.post('http://localhost:8080/api/bookings/create', bookingDetails);
+    toast.success("Booking successful!");
+    setBookingProvider(null);
+  } catch (err) {
+    console.error("Error details:", err.response?.data);
+    toast.error("Booking failed. Check console.");
+  }
+};
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.clear();
     navigate('/login', { replace: true });
   };
 
+  const filteredCategories = useMemo(() => {
+    return categories.filter(cat => cat.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [searchTerm]);
+
   return (
     <LiveBackground>
-      <div className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <motion.header
-          initial={{ opacity: 0, y: -24 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 rounded-[32px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8"
-        >
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
-                <Sparkles size={14} />
-                Customer Control Center
-              </div>
-              <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl">
-                {`Welcome back${user?.name ? `, ${user.name}` : ''}.`}
-              </h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">
-                Book trusted help, track ongoing jobs, and keep your home services moving without friction.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-              <button
-                type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-              >
-                Book a service
-                <ArrowRight size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]"
-              >
-                <LogOut size={16} />
-                Logout
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {quickStats.map((item, index) => (
-              <motion.div
-                key={item.label}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + index * 0.08 }}
-                className="rounded-3xl border border-white/8 bg-black/20 p-5"
-              >
-                <p className="text-sm text-slate-400">{item.label}</p>
-                <p className="mt-2 text-2xl font-bold text-white">{item.value}</p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.header>
-
-        <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-          <div className="space-y-6">
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl"
-            >
-              <div className="mb-5 flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-bold text-white">Find your next service</h2>
-                  <p className="mt-1 text-sm text-slate-400">Search categories and discover verified specialists.</p>
+      {/* --- BOOKING MODAL --- */}
+      <AnimatePresence>
+        {bookingProvider && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} 
+              className="bg-[#0c0c0e] border border-white/10 p-8 rounded-[2.5rem] max-w-md w-full relative shadow-2xl">
+              <button onClick={() => setBookingProvider(null)} className="absolute right-6 top-6 text-slate-500 hover:text-white transition-colors"><X /></button>
+              <h2 className="text-2xl font-black text-white mb-1">Confirm Booking</h2>
+              <p className="text-indigo-400 font-bold mb-6">Expert: {bookingProvider.name}</p>
+              
+              <form className="space-y-4" onSubmit={handleBookingSubmit}>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Appointment Date</label>
+                  <input name="date" type="date" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:ring-2 ring-indigo-500/20" required />
                 </div>
-              </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Describe Requirements</label>
+                  <textarea name="description" placeholder="E.g., Kitchen sink pipe is leaking..." 
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white h-28 outline-none focus:ring-2 ring-indigo-500/20" required />
+                </div>
+                <button type="submit" className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-indigo-600/30">
+                  Request Service
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Try cleaning, electrical, safety..."
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 py-4 pl-12 pr-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/40 focus:bg-black/30"
-                />
-              </div>
+      <div className="flex min-h-screen text-slate-200">
+        <aside className="hidden lg:flex w-72 flex-col border-r border-white/5 bg-black/20 backdrop-blur-2xl px-6 py-10">
+          <div className="flex items-center gap-3 mb-12 px-2">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <ShieldCheck className="text-white" size={24} />
+            </div>
+            <span className="text-xl font-black text-white tracking-tighter">ServiceMate</span>
+          </div>
+          <nav className="flex-1 space-y-2">
+            <button onClick={() => setView('home')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all ${view === 'home' ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 shadow-inner' : 'text-slate-500 hover:text-white'}`}>
+              <LayoutDashboard size={20}/> <span className="font-bold text-sm">Explore</span>
+            </button>
+          </nav>
+          <button onClick={handleLogout} className="flex items-center gap-4 px-4 py-3 text-slate-500 hover:text-red-400 transition-all font-bold text-sm mt-auto">
+            <LogOut size={20} /> Logout
+          </button>
+        </aside>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {filteredCategories.map((category, index) => {
-                  const Icon = category.icon;
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8 lg:p-12">
+          {view === 'home' ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <header className="mb-12 flex justify-between items-start">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold uppercase tracking-widest mb-4">
+                    <Sparkles size={12} /> Dashboard v1.0
+                  </div>
+                  <h1 className="text-4xl lg:text-6xl font-black text-white">
+                    Welcome back, <span className="bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">{user?.name || 'Sanjay'}</span>
+                  </h1>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center font-bold text-indigo-400 shadow-xl">
+                  {user?.name?.[0] || 'S'}
+                </div>
+              </header>
 
-                  return (
-                    <motion.button
-                      key={category.name}
-                      type="button"
-                      initial={{ opacity: 0, y: 24 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.25 + index * 0.08 }}
-                      whileHover={{ y: -6 }}
-                      className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] p-6 text-left transition hover:border-white/20"
-                    >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${category.accent} opacity-80`} />
-                      <div className="relative">
-                        <div className="mb-4 inline-flex rounded-2xl border border-white/10 bg-black/20 p-3 text-white">
-                          <Icon size={22} />
+              <div className="grid gap-8 xl:grid-cols-[1fr_350px]">
+                <div className="space-y-8">
+                  <div className="relative group">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={22} />
+                    <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search services..." 
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-3xl py-6 pl-14 pr-6 text-lg text-white outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredCategories.map((cat) => (
+                      <motion.button key={cat.name} whileHover={{ y: -5 }} onClick={() => { setSelectedCategory(cat.name); setView('listing'); }}
+                        className="group relative p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 text-left hover:border-indigo-500/40 transition-all overflow-hidden">
+                        <div className={`absolute -right-4 -top-4 w-32 h-32 blur-[60px] opacity-20 bg-gradient-to-br ${cat.accent}`} />
+                        <cat.icon className="mb-6 text-white group-hover:scale-110 transition-transform duration-500" size={32} />
+                        <h3 className="text-2xl font-bold text-white leading-none">{cat.name}</h3>
+                        <p className="text-slate-500 text-sm mt-3 leading-relaxed">{cat.desc}</p>
+                        <div className="flex items-center gap-2 text-indigo-400 text-xs font-black uppercase tracking-widest mt-6">
+                          Explore Experts <ChevronRight size={14} />
                         </div>
-                        <h3 className="text-xl font-bold text-white">{category.name}</h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-300">{category.description}</p>
-                        <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200">
-                          Explore providers
-                          <ArrowRight size={15} className="transition group-hover:translate-x-1" />
-                        </span>
-                      </div>
-                    </motion.button>
-                  );
-                })}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+                <aside className="p-8 rounded-[2.5rem] bg-gradient-to-br from-indigo-600 to-purple-800 text-white shadow-2xl h-fit">
+                  <Clock3 size={40} className="mb-6 text-white/40" />
+                  <h3 className="text-2xl font-black mb-4">Urgent Help?</h3>
+                  <p className="text-indigo-100/70 mb-8 text-sm leading-relaxed">Priority booking connects you with experts within 60 minutes.</p>
+                  <button className="w-full py-4 bg-white text-indigo-700 font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg">Request Priority</button>
+                </aside>
               </div>
-
-              {filteredCategories.length === 0 && (
-                <div className="mt-6 rounded-3xl border border-dashed border-white/10 bg-black/20 p-6 text-sm text-slate-400">
-                  No matching categories found for "{searchTerm}".
+            </motion.div>
+          ) : (
+            <motion.section initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+              <button onClick={() => setView('home')} className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors mb-8 font-bold">
+                <ArrowLeft size={18} /> Back to Dashboard
+              </button>
+              <h2 className="text-4xl font-black text-white mb-2 capitalize">
+                {selectedCategory} <span className="text-indigo-500">Pros</span>
+              </h2>
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-24 text-slate-500">
+                  <Loader2 className="animate-spin mb-4" size={44} />
+                  <p className="font-medium">Connecting to ServiceMate Database...</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {providers.length > 0 ? providers.map((pro) => (
+                    <div key={pro.id} className="p-6 bg-white/[0.03] border border-white/10 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center group hover:bg-white/[0.05] transition-all">
+                      <div className="flex gap-5 items-center">
+                        <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-2xl border border-indigo-500/20 shadow-inner">
+                          {pro.name[0]}
+                        </div>
+                        <div>
+                          <h4 className="text-xl font-bold text-white">{pro.name}</h4>
+                          <div className="flex items-center gap-4 text-sm text-slate-400 mt-1 font-medium">
+                            <span className="flex items-center gap-1 text-yellow-500"><Star size={14} fill="currentColor"/> 4.8</span>
+                            <span className="flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-500"/> Verified</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-6 sm:mt-0 text-right">
+                        <p className="text-2xl font-black text-white">₹{pro.price || '499'}<span className="text-xs text-slate-500 font-normal">/hr</span></p>
+                        <button onClick={() => setBookingProvider(pro)} className="mt-3 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition-all shadow-xl shadow-indigo-600/20">
+                          Book Now
+                        </button>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="p-12 text-center rounded-[2.5rem] border border-dashed border-white/10 bg-white/[0.02]">
+                      <p className="text-slate-500 text-lg mb-2">No experts found for "{selectedCategory}" yet.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.section>
-
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl"
-            >
-              <div className="mb-5">
-                <h2 className="text-xl font-bold text-white">Recommended providers</h2>
-                <p className="mt-1 text-sm text-slate-400">Highly rated teams available around your area.</p>
-              </div>
-
-              <div className="grid gap-4">
-                {featuredPros.map((pro, index) => (
-                  <motion.div
-                    key={pro.name}
-                    initial={{ opacity: 0, x: -16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.36 + index * 0.08 }}
-                    className="flex flex-col gap-4 rounded-3xl border border-white/8 bg-black/20 p-5 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">{pro.name}</h3>
-                      <p className="mt-1 text-sm text-slate-400">{pro.specialty}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-300">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-300/10 px-3 py-1 text-amber-200">
-                        <Star size={14} className="fill-current" />
-                        {pro.rating}
-                      </span>
-                      <span>{pro.jobs}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.section>
-          </div>
-
-          <motion.aside
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.25 }}
-            className="space-y-6"
-          >
-            <section className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-white">Upcoming bookings</h2>
-                  <p className="mt-1 text-sm text-slate-400">Your scheduled service activity.</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {upcomingBookings.map((booking) => (
-                  <div key={booking.id} className="rounded-3xl border border-white/8 bg-black/20 p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-lg font-semibold text-white">{booking.title}</p>
-                        <p className="mt-1 text-sm text-slate-400">{booking.provider}</p>
-                      </div>
-                      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-                        {booking.status}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 space-y-2 text-sm text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <CalendarDays size={15} />
-                        <span>{booking.date}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin size={15} />
-                        <span>{booking.address}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-white/10 bg-gradient-to-br from-cyan-400/12 via-white/[0.04] to-transparent p-6 backdrop-blur-xl">
-              <div className="inline-flex rounded-2xl border border-cyan-200/20 bg-cyan-200/10 p-3 text-cyan-100">
-                <Clock3 size={20} />
-              </div>
-              <h2 className="mt-4 text-xl font-bold text-white">Need urgent help?</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Use priority booking to reach the fastest available provider for emergency fixes and same-day visits.
-              </p>
-              <button
-                type="button"
-                className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-              >
-                Request priority support
-                <ArrowRight size={15} />
-              </button>
-            </section>
-          </motion.aside>
-        </div>
+          )}
+        </main>
       </div>
     </LiveBackground>
   );

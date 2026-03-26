@@ -125,7 +125,7 @@ const SignUp = () => {
         title="Join ServiceMate"
         subtitle="Create your account in a few simple steps."
       >
-        <div className="flex justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-4">
+        <div className="theme-panel flex justify-center rounded-3xl px-3 py-4">
           <GoogleLogin
             onSuccess={handleGoogleSync}
             onError={() => toast.error('Google Sync Failed')}
@@ -136,23 +136,24 @@ const SignUp = () => {
         </div>
 
         <div className="my-6 flex items-center gap-4">
-          <div className="h-px flex-1 bg-white/10" />
-          <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500">or</span>
-          <div className="h-px flex-1 bg-white/10" />
+          <div className="h-px flex-1 bg-[var(--border-soft)]" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-[var(--text-muted)]">or</span>
+          <div className="h-px flex-1 bg-[var(--border-soft)]" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-2 rounded-[1.6rem] border border-white/10 bg-white/5 p-2 sm:grid-cols-2">
+          <div className="grid gap-2 rounded-[1.6rem] border border-[var(--hero-card-border)] bg-[var(--surface-muted)] p-2 sm:grid-cols-2">
             {['customer', 'provider'].map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => setForm({ ...form, role: r })}
-                  className={`rounded-2xl px-4 py-3 text-sm font-bold capitalize transition-all ${
+                className={`rounded-2xl px-4 py-3 text-sm font-bold capitalize transition-all ${
                   form.role === r
-                    ? 'bg-cyan-300 text-slate-950 shadow-[0_16px_40px_rgba(103,232,249,0.18)]'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                    ? 'text-[var(--primary-contrast)] shadow-[0_16px_40px_rgba(79,212,235,0.18)]'
+                    : 'text-[var(--text-muted)] hover:opacity-80'
                 }`}
+                style={form.role === r ? { backgroundColor: 'var(--primary-accent)' } : undefined}
               >
                 {r}
               </button>
@@ -160,7 +161,7 @@ const SignUp = () => {
           </div>
 
           <div className="premium-input-wrapper group">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-cyan-300" size={20} />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--primary-accent-strong)]" size={20} />
             <input
               className="premium-input"
               placeholder="Full name"
@@ -171,7 +172,7 @@ const SignUp = () => {
           </div>
 
           <div className="premium-input-wrapper group relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-cyan-300" size={20} />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--primary-accent-strong)]" size={20} />
             <input
               className="premium-input pr-28"
               type="email"
@@ -186,7 +187,8 @@ const SignUp = () => {
                 type="button"
                 onClick={handleSendOtp}
                 disabled={timer > 0 || loading}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 transition-opacity disabled:opacity-50"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-3 py-2 text-xs font-bold text-[var(--primary-contrast)] transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: 'var(--primary-accent)' }}
               >
                 {timer > 0 ? `${timer}s` : 'Send OTP'}
               </button>
@@ -212,7 +214,8 @@ const SignUp = () => {
                   <button
                     type="button"
                     onClick={handleVerifyOtp}
-                    className="rounded-2xl bg-emerald-500 px-6 py-4 text-sm font-bold text-white transition-colors hover:bg-emerald-400"
+                    className="rounded-2xl px-6 py-4 text-sm font-bold text-white transition-colors hover:opacity-90"
+                    style={{ backgroundColor: '#0f172a' }}
                   >
                     Verify
                   </button>
@@ -229,14 +232,14 @@ const SignUp = () => {
                 exit={{ height: 0, opacity: 0 }}
                 className="premium-input-wrapper group relative overflow-hidden"
               >
-                <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-cyan-300" size={20} />
+                <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--primary-accent-strong)]" size={20} />
                 <select
                   className="premium-input pr-10"
                   onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
                   required={form.role === 'provider'}
                   value={form.serviceType}
                 >
-                 <option value="" disabled selected>Select specialty</option>
+                 <option value="" disabled>Select specialty</option>
                  <option value="AC Service">AC Service</option>
                  <option value="Appliance Repair">Appliance Repair</option>
                  <option value="Carpentry">Carpentry</option>
@@ -246,14 +249,14 @@ const SignUp = () => {
                  <option value="Pest Control">Pest Control</option>
                  <option value="Plumbing">Plumbing</option>
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={20} />
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="premium-input-wrapper group relative">
-            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-cyan-300" size={20} />
-            <span className="absolute left-12 top-1/2 -translate-y-1/2 border-r border-slate-700 pr-2 font-bold text-slate-400">+91</span>
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--primary-accent-strong)]" size={20} />
+            <span className="absolute left-12 top-1/2 -translate-y-1/2 border-r border-[var(--border-soft)] pr-2 font-bold text-[var(--text-muted)]">+91</span>
             <input
               className="premium-input pl-24"
               placeholder="Mobile number"
@@ -264,7 +267,7 @@ const SignUp = () => {
           </div>
 
           <div className="premium-input-wrapper group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-cyan-300" size={20} />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--primary-accent-strong)]" size={20} />
             <input
               className="premium-input"
               type="password"
@@ -280,9 +283,9 @@ const SignUp = () => {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-400">
+        <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-cyan-300 transition-colors hover:text-cyan-200">
+          <Link to="/login" className="font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-75">
             Sign in
           </Link>
         </p>

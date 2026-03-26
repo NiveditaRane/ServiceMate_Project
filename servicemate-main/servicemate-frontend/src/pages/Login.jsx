@@ -61,7 +61,7 @@ const Login = () => {
       >
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="premium-input-wrapper group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-cyan-300" size={20} />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--primary-accent-strong)]" size={20} />
             <input
               className="premium-input"
               type="email"
@@ -74,7 +74,7 @@ const Login = () => {
 
           <div className="space-y-3">
             <div className="premium-input-wrapper group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-cyan-300" size={20} />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors group-focus-within:text-[var(--primary-accent-strong)]" size={20} />
               <input
                 className="premium-input"
                 type="password"
@@ -85,8 +85,8 @@ const Login = () => {
               />
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Use your registered email and password.</span>
-              <Link to="/forgot-password" className="font-semibold text-cyan-300 transition-colors hover:text-cyan-200">
+              <span className="text-[var(--text-muted)]">Use your registered email and password.</span>
+              <Link to="/forgot-password" className="font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-75">
                 Forgot password?
               </Link>
             </div>
@@ -98,12 +98,12 @@ const Login = () => {
         </form>
 
         <div className="my-6 flex items-center gap-4">
-          <div className="h-px flex-1 bg-white/10" />
-          <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500">or</span>
-          <div className="h-px flex-1 bg-white/10" />
+          <div className="h-px flex-1 bg-[var(--border-soft)]" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-[var(--text-muted)]">or</span>
+          <div className="h-px flex-1 bg-[var(--border-soft)]" />
         </div>
 
-        <div className="flex justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-4">
+        <div className="theme-panel flex justify-center rounded-3xl px-3 py-4">
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => toast.error("Google Login Failed")}
@@ -113,9 +113,9 @@ const Login = () => {
           />
         </div>
 
-        <p className="mt-6 text-center text-sm text-slate-400">
+        <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
           New to ServiceMate?{' '}
-          <Link to="/signup" className="font-semibold text-cyan-300 transition-colors hover:text-cyan-200">
+          <Link to="/signup" className="font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-75">
             Create account
           </Link>
         </p>

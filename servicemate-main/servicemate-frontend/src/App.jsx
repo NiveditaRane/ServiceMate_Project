@@ -26,6 +26,10 @@ function App() {
     // Replace with your actual Client ID from Google Cloud Console
     <GoogleOAuthProvider clientId="1016094891451-ejbv4brsqqosojin2rmpf62ua9j23s1i.apps.googleusercontent.com">
       <Router>
+<<<<<<< HEAD
+=======
+        <Toaster position="top-right" reverseOrder={false} />
+>>>>>>> e72ab60ed14f9f5601b4c828ecb92357e3230a1b
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />

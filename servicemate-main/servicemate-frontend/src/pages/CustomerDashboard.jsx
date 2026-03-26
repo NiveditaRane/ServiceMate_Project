@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import LiveBackground from '../components/LiveBackground';
+import ThemeToggle from '../components/ThemeToggle';
 
 // 1. CATEGORIES CONFIGURATION
 const categories = [
@@ -153,8 +154,11 @@ const handleBookingSubmit = async (e) => {
                     Welcome back, <span className="bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">{user?.name || 'Sanjay'}</span>
                   </h1>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center font-bold text-indigo-400 shadow-xl">
-                  {user?.name?.[0] || 'S'}
+                <div className="flex flex-col items-end gap-3">
+                  <ThemeToggle />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 font-bold text-indigo-400 shadow-xl">
+                    {user?.name?.[0] || 'S'}
+                  </div>
                 </div>
               </header>
 

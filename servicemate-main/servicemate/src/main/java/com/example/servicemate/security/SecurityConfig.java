@@ -25,12 +25,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
-                .cors(cors -> {}) // Uses the CorsFilter bean below
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .anyRequest().authenticated()
-                );
+            .csrf(csrf -> csrf.disable()) // Disables CSRF for development
+            .cors(cors -> {}) // Enables the CorsFilter defined below
+            .authorizeHttpRequests(auth -> auth
+                // 1. Allows access to authentication (Signup/Login/OTP)
+                .requestMatchers("/api/auth/**").permitAll()
+                
+                // 2. UPDATED: Allows access to your Provider APIs
+                // This removes the 403 Forbidden error for your task
+                .requestMatchers("/api/provider/**").permitAll() 
+                
+                // 3. Requires login for any other URL not listed above
+                .anyRequest().authenticated()
+            );
         return http.build();
     }
 
@@ -38,7 +45,7 @@ public class SecurityConfig {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        config.setAllowedOrigins(Arrays.asList("http://localhost:5173")); // Your Vite Frontend URL
         config.setAllowedHeaders(Arrays.asList("Origin", "Content-Type", "Accept", "Authorization"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 

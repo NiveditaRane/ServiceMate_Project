@@ -1,6 +1,7 @@
 package com.example.servicemate.dto;
 
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 
 public class BookingRequest {
 
@@ -12,6 +13,7 @@ public class BookingRequest {
 
     // Optional fields (add if needed)
     private String description;
+    private LocalDate bookingDate;
 
     // Getters and Setters
     public Integer getUserId() {
@@ -36,5 +38,13 @@ public class BookingRequest {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public LocalDate getBookingDate() {
+        return bookingDate;
+    }
+
+    public void setBookingDate(LocalDate bookingDate) {
+        this.bookingDate = bookingDate;
     }
 }

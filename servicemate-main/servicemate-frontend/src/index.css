@@ -34,33 +34,34 @@
 
   :root[data-theme='light'] {
     color-scheme: light;
-    --app-bg: #f8f4ed;
-    --app-text: #16213a;
+    --app-bg: #f5f9ff;
+    --app-text: #182338;
     --panel-bg: rgba(255, 255, 255, 0.88);
-    --panel-strong: rgba(255, 255, 255, 0.96);
-    --surface-soft: rgba(231, 238, 248, 0.96);
-    --surface-muted: rgba(255, 255, 255, 0.94);
-    --surface-contrast: rgba(229, 233, 239, 0.92);
-    --border-soft: rgba(194, 201, 211, 0.55);
-    --text-primary: #0f172a;
-    --text-secondary: #44526a;
-    --text-muted: #67768d;
+    --panel-strong: rgba(255, 255, 255, 0.98);
+    --surface-soft: rgba(255, 255, 255, 0.92);
+    --surface-muted: rgba(244, 249, 255, 0.96);
+    --surface-contrast: rgba(239, 246, 255, 0.95);
+    --border-soft: rgba(202, 216, 234, 0.78);
+    --text-primary: #111827;
+    --text-secondary: #4b5d78;
+    --text-muted: #75849b;
     --text-dark: #0f172a;
-    --grid-line: rgba(209, 213, 219, 0.42);
-    --bg-overlay: radial-gradient(circle at top, rgba(255, 248, 237, 0.6), transparent 32%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(248, 244, 237, 0.92));
-    --orb-primary: rgba(244, 214, 170, 0.12);
-    --orb-secondary: rgba(255, 255, 255, 0.1);
-    --orb-tertiary: rgba(255, 241, 219, 0.16);
-    --toggle-bg: rgba(255, 255, 255, 0.88);
+    --grid-line: rgba(211, 223, 238, 0.58);
+    --bg-overlay: radial-gradient(circle at top left, rgba(191, 235, 255, 0.38), transparent 34%),
+      radial-gradient(circle at bottom right, rgba(216, 229, 255, 0.36), transparent 32%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(242, 248, 255, 0.98));
+    --orb-primary: rgba(88, 200, 255, 0.14);
+    --orb-secondary: rgba(116, 140, 255, 0.12);
+    --orb-tertiary: rgba(255, 255, 255, 0.46);
+    --toggle-bg: rgba(255, 255, 255, 0.96);
     --toggle-text: #0f172a;
-    --toggle-border: rgba(201, 208, 217, 0.74);
-    --hero-card-bg: rgba(255, 255, 255, 0.82);
-    --hero-card-shadow: 0 28px 70px rgba(15, 23, 42, 0.08);
-    --hero-card-border: rgba(218, 222, 227, 0.9);
-    --primary-accent: #4fd4eb;
-    --primary-accent-strong: #37c7e4;
-    --primary-contrast: #0f172a;
+    --toggle-border: rgba(208, 220, 235, 0.9);
+    --hero-card-bg: rgba(255, 255, 255, 0.88);
+    --hero-card-shadow: 0 18px 48px rgba(41, 72, 152, 0.08);
+    --hero-card-border: rgba(221, 232, 246, 0.98);
+    --primary-accent: #15b7ea;
+    --primary-accent-strong: #2a83f6;
+    --primary-contrast: #ffffff;
   }
 
   * {
@@ -159,7 +160,7 @@
     color: var(--toggle-text);
     border: 1px solid var(--toggle-border);
     backdrop-filter: blur(18px);
-    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.1);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   }
 
   .theme-background {
@@ -254,6 +255,12 @@ select {
   background-color: var(--surface-contrast);
 }
 
+:root[data-theme='light'] .backdrop-blur-2xl,
+:root[data-theme='light'] .backdrop-blur-xl,
+:root[data-theme='light'] .backdrop-blur-md {
+  backdrop-filter: blur(10px);
+}
+
 :root[data-theme='light'] .bg-slate-950\/45,
 :root[data-theme='light'] .bg-slate-950\/55,
 :root[data-theme='light'] .bg-slate-950\/75,
@@ -314,7 +321,7 @@ select {
 }
 
 :root[data-theme='light'] .bg-gradient-to-br {
-  background-image: linear-gradient(to bottom right, rgba(255, 255, 255, 0.98), rgba(247, 244, 237, 0.96), rgba(231, 238, 248, 0.85));
+  background-image: linear-gradient(to bottom right, rgba(255, 255, 255, 0.98), rgba(241, 250, 255, 0.96), rgba(231, 240, 255, 0.92));
 }
 
 :root[data-theme='light'] .shadow-\[0_16px_40px_rgba\(103\,232\,249\,0\.18\)\] {
@@ -326,13 +333,14 @@ select {
 }
 
 :root[data-theme='light'] .theme-button-primary {
-  background: #0f172a;
+  background: linear-gradient(135deg, #15b7ea 0%, #2a83f6 100%);
   color: #f8fafc;
-  border-color: rgba(15, 23, 42, 0.12);
+  border-color: rgba(63, 142, 255, 0.18);
+  box-shadow: 0 12px 24px rgba(42, 131, 246, 0.18);
 }
 
 :root[data-theme='light'] .theme-button-primary:hover {
-  background: #1e293b;
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
 }
 
 :root[data-theme='light'] .theme-button-secondary {
@@ -347,4 +355,15 @@ select {
 
 :root[data-theme='light'] .theme-progress-fill {
   background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
+}
+
+:root[data-theme='light'] .theme-grid {
+  opacity: 0.18;
+  background-size: 96px 96px;
+}
+
+:root[data-theme='light'] .theme-card,
+:root[data-theme='light'] .theme-panel,
+:root[data-theme='light'] .theme-pill {
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
 }

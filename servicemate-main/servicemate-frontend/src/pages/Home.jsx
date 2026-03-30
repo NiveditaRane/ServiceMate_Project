@@ -10,7 +10,10 @@ const Home = () => {
     <LiveBackground>
       <div className="min-h-screen px-5 py-6 sm:px-8 lg:px-12">
         <header className="theme-card mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 rounded-[2rem] px-6 py-3 sm:flex-nowrap sm:rounded-full sm:px-6">
-          <Link to="/" className="text-xl font-black tracking-tight text-[var(--text-primary)]">
+          <Link to="/" className="flex items-center gap-3 text-xl font-black tracking-tight text-[var(--text-primary)]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-base text-white">
+              S
+            </span>
             ServiceMate
           </Link>
           <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
@@ -23,7 +26,7 @@ const Home = () => {
             </Link>
             <Link
               to="/signup"
-              className="rounded-full px-5 py-2 text-sm font-bold text-[var(--primary-contrast)] transition-colors"
+              className="rounded-2xl px-6 py-3 text-sm font-bold text-[var(--primary-contrast)] transition-colors shadow-[0_12px_24px_rgba(42,131,246,0.16)]"
               style={{ backgroundColor: 'var(--primary-accent)' }}
             >
               Sign Up

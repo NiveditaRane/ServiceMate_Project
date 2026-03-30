@@ -26,7 +26,10 @@ const AuthLayout = ({ children, title, subtitle, eyebrow }) => {
               <ChevronLeft size={14} />
               Back
             </Link>
-            <Link to="/" className="text-lg font-black tracking-tight text-[var(--text-primary)]">
+            <Link to="/" className="flex items-center gap-2 text-lg font-black tracking-tight text-[var(--text-primary)]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-sm text-white">
+                S
+              </span>
               ServiceMate
             </Link>
             <div className="w-[58px]" />

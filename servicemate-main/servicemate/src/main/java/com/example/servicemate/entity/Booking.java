@@ -1,6 +1,7 @@
 package com.example.servicemate.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
 
 @Entity
 public class Booking {
@@ -16,6 +17,7 @@ public class Booking {
     private BookingStatus status;
 
     private String description;
+    private LocalDate bookingDate;
 
     // Getters and Setters
     public Integer getId() {
@@ -56,5 +58,13 @@ public class Booking {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public LocalDate getBookingDate() {
+        return bookingDate;
+    }
+
+    public void setBookingDate(LocalDate bookingDate) {
+        this.bookingDate = bookingDate;
     }
 }

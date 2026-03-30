@@ -39,8 +39,13 @@ public class BookingController {
             return ResponseEntity.badRequest().body("Invalid User ID");
         }
 
-        if (!userRepository.existsById(request.getProviderId())) {
+        User provider = userRepository.findById(request.getProviderId()).orElse(null);
+        if (provider == null || !"provider".equalsIgnoreCase(provider.getRole())) {
             return ResponseEntity.badRequest().body("Invalid Provider ID");
+        }
+
+        if (!Boolean.TRUE.equals(provider.getAvailability())) {
+            return ResponseEntity.badRequest().body("This provider is currently offline");
         }
 
         Booking booking = new Booking();

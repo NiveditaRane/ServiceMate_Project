@@ -13,6 +13,7 @@ public class UserDTO {
     private String serviceType;
     private String city;
     private String bio;
+    private Boolean availability;
 
     // Manual getters to be safe
     public Integer getId() { return id; }
@@ -24,4 +25,5 @@ public class UserDTO {
     public String getServiceType() { return serviceType; }
     public String getCity() { return city; }
     public String getBio() { return bio; }
+    public Boolean getAvailability() { return availability; }
 }

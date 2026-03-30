@@ -5,6 +5,7 @@ import com.example.servicemate.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/providers")
@@ -16,7 +17,15 @@ public class ProviderController {
 
     @GetMapping("/specialty/{type}")
     public List<User> getProviders(@PathVariable String type) {
-        // Use the IgnoreCase method we added to UserRepository
-        return userRepository.findByRoleIgnoreCaseAndServiceTypeIgnoreCase("provider", type);
+        return userRepository.findByRoleIgnoreCaseAndServiceTypeIgnoreCase("provider", type).stream()
+                .map(provider -> {
+                    if (provider.getAvailability() == null) {
+                        provider.setAvailability(Boolean.TRUE);
+                        return userRepository.save(provider);
+                    }
+                    return provider;
+                })
+                .filter(provider -> Boolean.TRUE.equals(provider.getAvailability()))
+                .collect(Collectors.toList());
     }
 }

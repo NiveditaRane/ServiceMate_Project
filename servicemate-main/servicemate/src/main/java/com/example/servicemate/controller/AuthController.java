@@ -33,6 +33,14 @@ public class AuthController {
 
     private Map<String, OtpData> otpCache = new HashMap<>();
 
+    private User ensureProviderAvailability(User user) {
+        if ("provider".equalsIgnoreCase(user.getRole()) && user.getAvailability() == null) {
+            user.setAvailability(Boolean.TRUE);
+            return userRepository.save(user);
+        }
+        return user;
+    }
+
     // 1. SEND OTP FOR SIGNUP
     @PostMapping("/signup-otp")
     public ResponseEntity<?> sendSignupOtp(@RequestBody Map<String, String> request) {
@@ -62,7 +70,10 @@ public class AuthController {
         user.setPhone(userDTO.getPhone());
         user.setRole(userDTO.getRole().toLowerCase());
         user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
-        if ("provider".equals(user.getRole())) user.setServiceType(userDTO.getServiceType());
+        if ("provider".equals(user.getRole())) {
+            user.setServiceType(userDTO.getServiceType());
+            user.setAvailability(Boolean.TRUE);
+        }
         user.setCity(userDTO.getCity());
         user.setBio(userDTO.getBio());
 
@@ -77,9 +88,10 @@ public class AuthController {
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isPresent() && passwordEncoder.matches(loginDTO.getPassword(), userOpt.get().getPassword())) {
             String token = jwtUtils.generateToken(email);
+            User user = ensureProviderAvailability(userOpt.get());
             Map<String, Object> response = new HashMap<>();
             response.put("token", token);
-            response.put("user", userOpt.get());
+            response.put("user", user);
             return ResponseEntity.ok(response);
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Credentials");
@@ -101,7 +113,7 @@ public class AuthController {
         }
 
         // 3. User exists, so we have their phone number and role already.
-        User user = userOpt.get();
+        User user = ensureProviderAvailability(userOpt.get());
         String token = jwtUtils.generateToken(email);
 
         Map<String, Object> response = new HashMap<>();
@@ -152,6 +164,14 @@ public class AuthController {
         return ResponseEntity.status(404).body("Error");
     }
 
+    @GetMapping("/profile/{id}")
+    public ResponseEntity<?> getProfile(@PathVariable Integer id) {
+        return userRepository.findById(id)
+                .map(this::ensureProviderAvailability)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
+    }
+
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(@RequestBody UserDTO profileDTO) {
         if (profileDTO.getId() == null) {
@@ -193,6 +213,9 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Service type is required");
             }
             user.setServiceType(trimmedServiceType);
+            if (profileDTO.getAvailability() != null) {
+                user.setAvailability(profileDTO.getAvailability());
+            }
         }
 
         userRepository.save(user);

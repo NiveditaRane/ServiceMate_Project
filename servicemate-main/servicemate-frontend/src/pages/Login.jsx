@@ -13,16 +13,41 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '' });
 
+  const getAvailabilityKey = (user) => `provider-availability:${user.id ?? user.email ?? 'unknown'}`;
+
+  const persistUserSession = (userPayload, token) => {
+    const persistedAvailability = localStorage.getItem(getAvailabilityKey(userPayload));
+    const nextUser = {
+      ...userPayload,
+      availability:
+        userPayload.role === 'provider'
+          ? (
+            typeof userPayload.availability === 'boolean'
+              ? userPayload.availability
+              : persistedAvailability === null
+                ? true
+                : persistedAvailability === 'true'
+          )
+          : userPayload.availability,
+    };
+
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+    if (nextUser.role === 'provider') {
+      localStorage.setItem(getAvailabilityKey(nextUser), String(nextUser.availability));
+    }
+    return nextUser;
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await axios.post('http://localhost:8080/api/auth/login', form);
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      const user = persistUserSession(res.data.user, res.data.token);
       toast.success("Welcome Back!");
       // Navigate based on role saved in DB
-      navigate(res.data.user.role === 'provider' ? '/provider-dashboard' : '/customer-dashboard');
+      navigate(user.role === 'provider' ? '/provider-dashboard' : '/customer-dashboard');
     } catch (err) {
       toast.error(err.response?.data || "Login failed");
     } finally {
@@ -36,12 +61,11 @@ const Login = () => {
       const res = await axios.post('http://localhost:8080/api/auth/google-login', {
         email: decoded.email
       });
-      
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      
-      toast.success(`Welcome back, ${res.data.user.name}`);
-      navigate(res.data.user.role === 'provider' ? '/provider-dashboard' : '/customer-dashboard');
+
+      const user = persistUserSession(res.data.user, res.data.token);
+
+      toast.success(`Welcome back, ${user.name}`);
+      navigate(user.role === 'provider' ? '/provider-dashboard' : '/customer-dashboard');
     } catch (err) {
       if (err.response?.status === 404) {
         toast.error("Account not found. Please sign up first!");

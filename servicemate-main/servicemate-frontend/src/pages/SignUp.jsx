@@ -214,8 +214,7 @@ const SignUp = () => {
                   <button
                     type="button"
                     onClick={handleVerifyOtp}
-                    className="rounded-2xl px-6 py-4 text-sm font-bold text-white transition-colors hover:opacity-90"
-                    style={{ backgroundColor: '#0f172a' }}
+                    className="theme-button-primary rounded-2xl px-6 py-4 text-sm font-bold transition-colors hover:opacity-90"
                   >
                     Verify
                   </button>

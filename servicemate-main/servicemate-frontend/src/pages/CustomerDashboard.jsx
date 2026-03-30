@@ -5,7 +5,7 @@ import {
   ArrowLeft, Bell, CalendarDays, ChevronRight, Loader2, LogOut, Search, ShieldCheck,
   Sparkles, Star, UserCircle2, Wrench, Zap, Paintbrush, Droplets, Hammer, Bug, Wind, X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import LiveBackground from '../components/LiveBackground';
 import ThemeToggle from '../components/ThemeToggle';
@@ -21,23 +21,72 @@ const categories = [
   ['Home Safety', ShieldCheck, 'CCTV and smart lock setup.'],
 ];
 
+const clearSession = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+};
+
 const CustomerDashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const [view, setView] = useState('home');
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [view, setView] = useState(searchParams.get('view') === 'listing' ? 'listing' : 'home');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [bookingProvider, setBookingProvider] = useState(null);
 
   useEffect(() => {
+    const nextView = searchParams.get('view') === 'listing' ? 'listing' : 'home';
+    const nextCategory = searchParams.get('category') || '';
+    const nextSearch = searchParams.get('search') || '';
+    setView(nextView);
+    setSelectedCategory(nextCategory);
+    setSearch(nextSearch);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const nextParams = {};
+    if (view === 'listing' && selectedCategory) {
+      nextParams.view = 'listing';
+      nextParams.category = selectedCategory;
+    }
+    if (search.trim()) {
+      nextParams.search = search;
+    }
+    setSearchParams(nextParams, { replace: true });
+  }, [view, selectedCategory, search, setSearchParams]);
+
+  const loadProviders = (showLoader = false) => {
+    if (!selectedCategory) return Promise.resolve();
+    if (showLoader) setLoading(true);
+    return axios
+      .get(`http://localhost:8080/api/providers/specialty/${selectedCategory.toLowerCase()}`)
+      .then((res) => {
+        const nextProviders = (Array.isArray(res.data) ? res.data : []).filter((provider) => provider.availability !== false);
+        setProviders(nextProviders);
+        setBookingProvider((current) => (
+          current && !nextProviders.some((provider) => provider.id === current.id) ? null : current
+        ));
+      })
+      .catch(() => {
+        toast.error('Database connection failed.');
+      })
+      .finally(() => {
+        if (showLoader) setLoading(false);
+      });
+  };
+
+  useEffect(() => {
     if (view !== 'listing' || !selectedCategory) return;
-    setLoading(true);
-    axios.get(`http://localhost:8080/api/providers/specialty/${selectedCategory.toLowerCase()}`)
-      .then((res) => setProviders(res.data))
-      .catch(() => toast.error('Database connection failed.'))
-      .finally(() => setLoading(false));
+    loadProviders(true);
+
+    const intervalId = window.setInterval(() => {
+      loadProviders(false);
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
   }, [view, selectedCategory]);
 
   const filteredCategories = useMemo(
@@ -58,7 +107,7 @@ const CustomerDashboard = () => {
       toast.success('Booking successful!');
       setBookingProvider(null);
     } catch (err) {
-      toast.error('Booking failed. Check console.');
+      toast.error(err.response?.data || 'Booking failed. Check console.');
     }
   };
 
@@ -92,7 +141,7 @@ const CustomerDashboard = () => {
             <div className="flex items-center gap-3">
               <button type="button" className="theme-button-secondary rounded-2xl p-3 text-[var(--text-muted)]"><Bell size={18} /></button>
               <ThemeToggle />
-              <button type="button" onClick={() => { localStorage.clear(); navigate('/login', { replace: true }); }} className="theme-button-secondary rounded-2xl px-4 py-3 text-sm font-semibold"><span className="inline-flex items-center gap-2"><LogOut size={16} />Logout</span></button>
+              <button type="button" onClick={() => { clearSession(); navigate('/login', { replace: true }); }} className="theme-button-secondary rounded-2xl px-4 py-3 text-sm font-semibold"><span className="inline-flex items-center gap-2"><LogOut size={16} />Logout</span></button>
               <div className="theme-panel flex items-center gap-3 rounded-2xl px-4 py-2"><div><p className="text-sm font-semibold text-[var(--text-primary)]">{user?.name || 'Customer'}</p><p className="text-xs text-[var(--text-muted)]">Customer</p></div><div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--text-primary)] text-sm font-black text-[var(--panel-strong)]">{user?.name?.[0] || 'C'}</div></div>
             </div>
           </div>
@@ -136,7 +185,7 @@ const CustomerDashboard = () => {
           </>
         ) : (
           <section className="theme-card rounded-[34px] p-6 sm:p-8">
-            <button type="button" onClick={() => setView('home')} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-sky-600"><ArrowLeft size={16} /> Back to dashboard</button>
+            <button type="button" onClick={() => { setView('home'); setSelectedCategory(''); }} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-sky-600"><ArrowLeft size={16} /> Back to dashboard</button>
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div><h2 className="text-3xl font-black text-[var(--text-primary)]">{selectedCategory} Pros</h2><p className="mt-2 text-sm text-[var(--text-muted)]">Verified providers available for this category.</p></div>
               <span className="theme-panel rounded-full px-4 py-2 text-sm font-semibold text-[var(--text-secondary)]">{providers.length} providers</span>

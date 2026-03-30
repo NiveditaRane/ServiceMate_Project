@@ -37,6 +37,9 @@ public class User {
     @Column(name = "bio", length = 1000)
     private String bio;
 
+    @Column(name = "availability", nullable = false)
+    private Boolean availability = true;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -64,4 +67,7 @@ public class User {
 
     public String getBio() { return bio; }
     public void setBio(String bio) { this.bio = bio; }
+
+    public Boolean getAvailability() { return availability; }
+    public void setAvailability(Boolean availability) { this.availability = availability; }
 }

@@ -15,6 +15,5 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     Optional<User> findByEmail(String email);
 
-    // Sanjay's Task: API Integration for Dashboard
     List<User> findByRoleIgnoreCaseAndServiceTypeIgnoreCase(String role, String serviceType);
 }

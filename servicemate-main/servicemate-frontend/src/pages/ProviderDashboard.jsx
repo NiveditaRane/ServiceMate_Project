@@ -44,14 +44,21 @@ const statStyles = [
 const formatDate = (value, opts = { day: '2-digit', month: 'short', year: 'numeric' }) =>
   value ? new Intl.DateTimeFormat('en-IN', opts).format(new Date(`${value}T00:00:00`)) : 'Date not provided';
 
+const clearSession = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+};
+
 const ProviderDashboard = () => {
   const navigate = useNavigate();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const availabilityKey = `provider-availability:${storedUser.id ?? storedUser.email ?? 'unknown'}`;
+  const persistedAvailability = localStorage.getItem(availabilityKey);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [activeBookingId, setActiveBookingId] = useState(null);
-  const [isAvailable, setIsAvailable] = useState(true);
   const [editing, setEditing] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [showProfileOverlay, setShowProfileOverlay] = useState(false);
@@ -63,6 +70,12 @@ const ProviderDashboard = () => {
     serviceType: storedUser.serviceType || 'electrical',
     city: storedUser.city || '',
     bio: storedUser.bio || '',
+    availability:
+      typeof storedUser.availability === 'boolean'
+        ? storedUser.availability
+        : persistedAvailability === null
+          ? true
+          : persistedAvailability === 'true',
   });
 
   useEffect(() => {
@@ -71,7 +84,10 @@ const ProviderDashboard = () => {
       return;
     }
     api.get(`/api/bookings/provider/${storedUser.id}`)
-      .then((res) => setBookings(Array.isArray(res.data) ? res.data : []))
+      .then((res) => {
+        syncStoredUser(storedUser);
+        setBookings(Array.isArray(res.data) ? res.data : []);
+      })
       .catch(() => toast.error('Failed to load bookings'))
       .finally(() => setLoading(false));
   }, [navigate, storedUser?.id]);
@@ -93,6 +109,35 @@ const ProviderDashboard = () => {
     return Math.round((keys.filter((k) => String(form[k] || '').trim()).length / keys.length) * 100);
   }, [form]);
 
+  const syncStoredUser = (user, overrides = {}) => {
+    const nextUser = {
+      ...storedUser,
+      ...user,
+      ...overrides,
+    };
+    localStorage.setItem('user', JSON.stringify(nextUser));
+    localStorage.setItem(
+      availabilityKey,
+      String(typeof nextUser.availability === 'boolean' ? nextUser.availability : true),
+    );
+    setForm((current) => ({
+      ...current,
+      id: nextUser.id,
+      name: nextUser.name || '',
+      email: nextUser.email || '',
+      phone: nextUser.phone || '',
+      serviceType: nextUser.serviceType || 'electrical',
+      city: nextUser.city || '',
+      bio: nextUser.bio || '',
+      availability:
+        typeof nextUser.availability === 'boolean'
+          ? nextUser.availability
+          : persistedAvailability === null
+            ? true
+            : persistedAvailability === 'true',
+    }));
+  };
+
   const saveProfile = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name is required');
@@ -102,14 +147,39 @@ const ProviderDashboard = () => {
       const res = await api.put('/api/auth/profile', {
         id: form.id, name: form.name.trim(), phone: form.phone,
         serviceType: form.serviceType, city: form.city.trim(), bio: form.bio.trim(),
+        availability: form.availability,
       });
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      syncStoredUser(res.data.user);
       setEditing(false);
       toast.success('Profile updated');
     } catch (error) {
       toast.error(error.response?.data || 'Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleAvailability = async () => {
+    const nextAvailability = !form.availability;
+    setAvailabilitySaving(true);
+    setForm((current) => ({ ...current, availability: nextAvailability }));
+    try {
+      const res = await api.put('/api/auth/profile', {
+        id: form.id,
+        name: form.name.trim(),
+        phone: form.phone,
+        serviceType: form.serviceType,
+        city: form.city.trim(),
+        bio: form.bio.trim(),
+        availability: nextAvailability,
+      });
+      syncStoredUser(res.data.user, { availability: nextAvailability });
+      toast.success(nextAvailability ? 'You are visible for new jobs' : 'You are now offline');
+    } catch (error) {
+      setForm((current) => ({ ...current, availability: !nextAvailability }));
+      toast.error(error.response?.data || 'Failed to update availability');
+    } finally {
+      setAvailabilitySaving(false);
     }
   };
 
@@ -139,7 +209,7 @@ const ProviderDashboard = () => {
               <button type="button" onClick={() => setActivePanel((current) => current === 'notifications' ? null : 'notifications')} className={`relative rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300 ${activePanel === 'notifications' ? 'ring-2 ring-sky-400/40' : ''}`}><Bell size={18} />{metrics.pending ? <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-400" /> : null}</button>
               <button type="button" onClick={() => setActivePanel((current) => current === 'messages' ? null : 'messages')} className={`rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300 ${activePanel === 'messages' ? 'ring-2 ring-sky-400/40' : ''}`}><MessageSquare size={18} /></button>
               <button type="button" onClick={() => { setActivePanel(null); setEditing(true); setShowProfileOverlay(true); }} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300"><PencilLine size={18} /></button>
-              <button type="button" onClick={() => { localStorage.clear(); navigate('/login', { replace: true }); }} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300"><LogOut size={18} /></button>
+              <button type="button" onClick={() => { clearSession(); navigate('/login', { replace: true }); }} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300"><LogOut size={18} /></button>
               <button type="button" onClick={() => { setActivePanel(null); setEditing(false); setShowProfileOverlay(true); }} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2"><div><p className="text-sm font-semibold text-white">{form.name || 'Provider'}</p><p className="text-xs text-slate-400">Provider</p></div><div className="flex h-10 w-10 items-center justify-center rounded-full bg-white font-black text-slate-950">{form.name?.[0] || 'P'}</div></button>
             </div>
           </div>
@@ -202,7 +272,33 @@ const ProviderDashboard = () => {
         <section className="mb-6 rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200"><Sparkles size={14} /> Provider Dashboard</div><h1 className="text-3xl font-black text-white sm:text-5xl">Welcome back, {form.name || 'Service Professional'}</h1><p className="mt-3 max-w-2xl text-sm text-slate-300">Manage bookings, review performance, and keep your profile polished from one workspace.</p></div>
-            <button type="button" onClick={() => setIsAvailable((v) => !v)} className="theme-button-secondary inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold">{isAvailable ? <ToggleRight size={18} className="text-emerald-300" /> : <ToggleLeft size={18} className="text-slate-500" />}{isAvailable ? 'Available for new jobs' : 'Currently offline'}</button>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.availability}
+              disabled={availabilitySaving}
+              onClick={toggleAvailability}
+              className="theme-button-secondary inline-flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold disabled:opacity-60"
+            >
+              <span
+                className={`relative inline-flex h-7 w-13 items-center rounded-full border transition-colors ${
+                  form.availability
+                    ? 'border-emerald-300/40 bg-emerald-400/20'
+                    : 'border-[var(--border-soft)] bg-[var(--surface-soft)]'
+                }`}
+                style={{ width: '3.25rem' }}
+              >
+                <span
+                  className={`absolute h-5 w-5 rounded-full transition-transform ${
+                    form.availability
+                      ? 'bg-emerald-400'
+                      : 'bg-[var(--text-muted)]'
+                  }`}
+                  style={{ transform: `translateX(${form.availability ? '1.75rem' : '0.25rem'})` }}
+                />
+              </span>
+              <span>{availabilitySaving ? 'Updating...' : form.availability ? 'Available for new jobs' : 'Currently offline'}</span>
+            </button>
           </div>
         </section>
 
@@ -242,7 +338,7 @@ const ProviderDashboard = () => {
                 <div className="mb-5 flex items-center justify-between"><div><p className="text-sm uppercase tracking-[0.18em] text-cyan-300">Notifications</p><h2 className="mt-2 text-2xl font-black text-white">Recent Alerts</h2></div><button type="button" onClick={() => setActivePanel(null)} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white">Close</button></div>
                 <div className="space-y-3">
                   {metrics.pending ? <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300"><p className="font-semibold text-white">{metrics.pending} pending booking request{metrics.pending > 1 ? 's' : ''}</p><p className="mt-1 text-slate-400">Review the booking table and respond to new customers.</p></div> : <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300">No new notifications right now.</div>}
-                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300"><p className="font-semibold text-white">Availability status</p><p className="mt-1 text-slate-400">{isAvailable ? 'You are visible for new bookings.' : 'You are currently offline for new bookings.'}</p></div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300"><p className="font-semibold text-white">Availability status</p><p className="mt-1 text-slate-400">{form.availability ? 'You are visible for new bookings.' : 'You are currently offline for new bookings.'}</p></div>
                 </div>
               </section>
             ) : null}

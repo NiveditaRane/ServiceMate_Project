@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft, Bell, CalendarDays, ChevronRight, Loader2, LogOut, Search, ShieldCheck,
-  Sparkles, Star, UserCircle2, Wrench, Zap, Paintbrush, Droplets, Hammer, Bug, Wind, X,
+  Sparkles, Star, UserCircle2, Wrench, Zap, Paintbrush, Droplets, Hammer, Bug, Wind, X, Phone, Mail, Clock3,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import api from '../api/axios';
 import LiveBackground from '../components/LiveBackground';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -21,27 +21,53 @@ const categories = [
   ['Home Safety', ShieldCheck, 'CCTV and smart lock setup.'],
 ];
 
+const labels = {
+  plumbing: 'Plumbing',
+  electrical: 'Electrical',
+  cleaning: 'Cleaning',
+  carpentry: 'Carpentry',
+  'deep cleaning': 'Deep Cleaning',
+  'appliance repair': 'Appliance Repair',
+  'pest control': 'Pest Control',
+  'ac service': 'AC Service',
+  'home safety': 'Home Safety',
+};
+
 const clearSession = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
 };
+
+const bookingStatusClass = {
+  PENDING: 'border-amber-200 bg-amber-50 text-amber-700',
+  CONFIRMED: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  CANCELLED: 'border-rose-200 bg-rose-50 text-rose-700',
+};
+
+const formatDate = (value, opts = { day: '2-digit', month: 'short', year: 'numeric' }) =>
+  value ? new Intl.DateTimeFormat('en-IN', opts).format(new Date(`${value}T00:00:00`)) : 'Date not provided';
 
 const CustomerDashboard = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [view, setView] = useState(searchParams.get('view') === 'listing' ? 'listing' : 'home');
+  const [homeSection, setHomeSection] = useState(searchParams.get('section') === 'bookings' ? 'bookings' : 'services');
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [bookingProvider, setBookingProvider] = useState(null);
+  const [customerBookings, setCustomerBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
 
   useEffect(() => {
     const nextView = searchParams.get('view') === 'listing' ? 'listing' : 'home';
+    const nextSection = searchParams.get('section') === 'bookings' ? 'bookings' : 'services';
     const nextCategory = searchParams.get('category') || '';
     const nextSearch = searchParams.get('search') || '';
     setView(nextView);
+    setHomeSection(nextSection);
     setSelectedCategory(nextCategory);
     setSearch(nextSearch);
   }, [searchParams]);
@@ -52,17 +78,20 @@ const CustomerDashboard = () => {
       nextParams.view = 'listing';
       nextParams.category = selectedCategory;
     }
+    if (view === 'home' && homeSection !== 'services') {
+      nextParams.section = homeSection;
+    }
     if (search.trim()) {
       nextParams.search = search;
     }
     setSearchParams(nextParams, { replace: true });
-  }, [view, selectedCategory, search, setSearchParams]);
+  }, [view, homeSection, selectedCategory, search, setSearchParams]);
 
   const loadProviders = (showLoader = false) => {
     if (!selectedCategory) return Promise.resolve();
     if (showLoader) setLoading(true);
-    return axios
-      .get(`http://localhost:8080/api/providers/specialty/${selectedCategory.toLowerCase()}`)
+    return api
+      .get(`/api/providers/specialty/${selectedCategory.toLowerCase()}`)
       .then((res) => {
         const nextProviders = (Array.isArray(res.data) ? res.data : []).filter((provider) => provider.availability !== false);
         setProviders(nextProviders);
@@ -77,6 +106,34 @@ const CustomerDashboard = () => {
         if (showLoader) setLoading(false);
       });
   };
+
+  const loadCustomerBookings = (showLoader = false) => {
+    if (!user?.id) return Promise.resolve();
+    if (showLoader) setBookingsLoading(true);
+    return api
+      .get(`/api/bookings/user/${user.id}`)
+      .then((res) => {
+        setCustomerBookings(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (showLoader) {
+          toast.error('Failed to load your bookings.');
+        }
+      })
+      .finally(() => {
+        if (showLoader) setBookingsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadCustomerBookings(true);
+
+    const intervalId = window.setInterval(() => {
+      loadCustomerBookings(false);
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [user?.id]);
 
   useEffect(() => {
     if (view !== 'listing' || !selectedCategory) return;
@@ -98,7 +155,7 @@ const CustomerDashboard = () => {
     e.preventDefault();
     const formData = new FormData(e.target);
     try {
-      await axios.post('http://localhost:8080/api/bookings/create', {
+      await api.post('/api/bookings/create', {
         userId: Number(user.id),
         providerId: Number(bookingProvider.id),
         bookingDate: formData.get('date'),
@@ -106,6 +163,7 @@ const CustomerDashboard = () => {
       });
       toast.success('Booking successful!');
       setBookingProvider(null);
+      loadCustomerBookings(false);
     } catch (err) {
       toast.error(err.response?.data || 'Booking failed. Check console.');
     }
@@ -149,39 +207,127 @@ const CustomerDashboard = () => {
 
         {view === 'home' ? (
           <>
-            <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-              <div className="theme-card rounded-[34px] p-6 sm:p-8">
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div><div className="mb-3 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.24em] text-sky-600"><Sparkles size={14} /> Customer Dashboard</div><h2 className="text-3xl font-black text-[var(--text-primary)]">Browse Services</h2><p className="mt-2 text-sm text-[var(--text-muted)]">Pick a category and see available experts.</p></div>
-                  <div className="relative w-full sm:max-w-sm">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={18} />
-                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search services" className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-soft)] py-3 pl-11 pr-4 text-[var(--text-primary)] outline-none" />
+            <section className="theme-card mb-6 rounded-[34px] p-4 sm:p-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setHomeSection('services')}
+                  className={`rounded-[24px] border px-5 py-4 text-left transition ${
+                    homeSection === 'services'
+                      ? 'border-sky-300 bg-sky-50 shadow-sm'
+                      : 'border-[var(--border-soft)] bg-[var(--surface-soft)]'
+                  }`}
+                >
+                  <p className={`text-xl font-black ${homeSection === 'services' ? 'text-slate-900' : 'text-[var(--text-primary)]'}`}>Browse Services</p>
+                  <p className={`mt-1 text-sm ${homeSection === 'services' ? 'text-slate-600' : 'text-[var(--text-muted)]'}`}>Open service categories and book a provider.</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHomeSection('bookings')}
+                  className={`rounded-[24px] border px-5 py-4 text-left transition ${
+                    homeSection === 'bookings'
+                      ? 'border-sky-300 bg-sky-50 shadow-sm'
+                      : 'border-[var(--border-soft)] bg-[var(--surface-soft)]'
+                  }`}
+                >
+                  <p className={`text-xl font-black ${homeSection === 'bookings' ? 'text-slate-900' : 'text-[var(--text-primary)]'}`}>Your Bookings</p>
+                  <p className={`mt-1 text-sm ${homeSection === 'bookings' ? 'text-slate-600' : 'text-[var(--text-muted)]'}`}>Open your confirmed, pending, and cancelled requests.</p>
+                </button>
+              </div>
+            </section>
+
+            {homeSection === 'bookings' ? (
+              <section className="theme-card rounded-[34px] p-6 sm:p-8">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-500">Your Bookings</p>
+                    <h2 className="mt-2 text-3xl font-black text-[var(--text-primary)]">Track accepted and pending requests</h2>
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">Accepted bookings from the provider dashboard will appear here automatically.</p>
+                  </div>
+                  <span className="theme-panel rounded-full px-4 py-2 text-sm font-semibold text-[var(--text-secondary)]">{customerBookings.length} total</span>
+                </div>
+
+                {bookingsLoading ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-[var(--text-muted)]">
+                    <Loader2 className="mb-4 animate-spin" size={32} />
+                    <p>Loading your bookings...</p>
+                  </div>
+                ) : customerBookings.length ? (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {customerBookings.map((booking) => (
+                      <div key={booking.id} className="theme-panel rounded-[2rem] p-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xl font-bold text-[var(--text-primary)]">{booking.providerName || 'Assigned provider'}</p>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">{labels[booking.providerServiceType] || booking.providerServiceType || 'Service provider'}</p>
+                          </div>
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${bookingStatusClass[booking.status] || 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                            {booking.status}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 space-y-3 text-sm text-[var(--text-secondary)]">
+                          <div className="flex items-center gap-2">
+                            <Clock3 size={16} className="text-sky-500" />
+                            <span>{formatDate(booking.bookingDate)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Phone size={16} className="text-sky-500" />
+                            <span>{booking.providerPhone ? `+91 ${booking.providerPhone}` : 'Phone not available yet'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Mail size={16} className="text-sky-500" />
+                            <span>{booking.providerEmail || 'Email not available yet'}</span>
+                          </div>
+                          <p className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-4 py-3 leading-7 text-[var(--text-secondary)]">
+                            {booking.description || 'No description provided.'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="theme-panel rounded-[2rem] border border-dashed px-6 py-14 text-center">
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">You have no bookings yet.</p>
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">Open Browse Services to create your first booking.</p>
+                  </div>
+                )}
+              </section>
+            ) : (
+              <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+                <div className="theme-card rounded-[34px] p-6 sm:p-8">
+                  <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div><div className="mb-3 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.24em] text-sky-600"><Sparkles size={14} /> Customer Dashboard</div><h2 className="text-3xl font-black text-[var(--text-primary)]">Browse Services</h2><p className="mt-2 text-sm text-[var(--text-muted)]">Pick a category and see available experts.</p></div>
+                    <div className="relative w-full sm:max-w-sm">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={18} />
+                      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search services" className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-soft)] py-3 pl-11 pr-4 text-[var(--text-primary)] outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {filteredCategories.map(([name, Icon, desc]) => (
+                      <button key={name} type="button" onClick={() => { setSelectedCategory(name); setView('listing'); }} className="theme-panel rounded-[2rem] p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200">
+                        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-500"><Icon size={24} /></div>
+                        <p className="text-2xl font-bold text-[var(--text-primary)]">{name}</p>
+                        <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">{desc}</p>
+                        <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-sky-600">Explore experts <ChevronRight size={16} /></span>
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {filteredCategories.map(([name, Icon, desc]) => (
-                    <button key={name} type="button" onClick={() => { setSelectedCategory(name); setView('listing'); }} className="theme-panel rounded-[2rem] p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200">
-                      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-500"><Icon size={24} /></div>
-                      <p className="text-2xl font-bold text-[var(--text-primary)]">{name}</p>
-                      <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">{desc}</p>
-                      <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-sky-600">Explore experts <ChevronRight size={16} /></span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <aside className="space-y-6">
-                <div className="rounded-[34px] border border-sky-100 bg-gradient-to-br from-cyan-50 to-blue-50 p-6 shadow-sm sm:p-8">
-                  <CalendarDays className="text-sky-500" size={28} />
-                  <h3 className="mt-5 text-2xl font-black text-slate-900">Priority Booking</h3>
-                  <p className="mt-3 text-base leading-7 text-slate-600">Need urgent help? Get connected with experts faster and keep your request moving.</p>
-                  <button type="button" className="theme-button-primary mt-6 rounded-2xl px-5 py-4 text-sm font-bold">Request Priority</button>
-                </div>
-                <div className="theme-card rounded-[34px] p-6 sm:p-8">
-                  <h3 className="text-2xl font-black text-[var(--text-primary)]">Account Snapshot</h3>
-                  <div className="mt-5 space-y-4">{[['Name', user?.name || 'Customer'], ['Role', user?.role || 'customer'], ['Preferred flow', 'Book and manage services']].map(([k, v]) => <div key={k} className="theme-panel flex items-center justify-between rounded-2xl px-4 py-3"><span className="text-[var(--text-muted)]">{k}</span><span className="font-semibold text-[var(--text-primary)]">{v}</span></div>)}</div>
-                </div>
-              </aside>
-            </section>
+                <aside className="space-y-6">
+                  <div className="rounded-[34px] border border-sky-100 bg-gradient-to-br from-cyan-50 to-blue-50 p-6 shadow-sm sm:p-8">
+                    <CalendarDays className="text-sky-500" size={28} />
+                    <h3 className="mt-5 text-2xl font-black text-slate-900">Priority Booking</h3>
+                    <p className="mt-3 text-base leading-7 text-slate-600">Need urgent help? Get connected with experts faster and keep your request moving.</p>
+                    <button type="button" className="theme-button-primary mt-6 rounded-2xl px-5 py-4 text-sm font-bold">Request Priority</button>
+                  </div>
+                  <div className="theme-card rounded-[34px] p-6 sm:p-8">
+                    <h3 className="text-2xl font-black text-[var(--text-primary)]">Account Snapshot</h3>
+                    <div className="mt-5 space-y-4">{[['Name', user?.name || 'Customer'], ['Role', user?.role || 'customer'], ['Preferred flow', 'Book and manage services']].map(([k, v]) => <div key={k} className="theme-panel flex items-center justify-between rounded-2xl px-4 py-3"><span className="text-[var(--text-muted)]">{k}</span><span className="font-semibold text-[var(--text-primary)]">{v}</span></div>)}</div>
+                  </div>
+                </aside>
+              </section>
+            )}
           </>
         ) : (
           <section className="theme-card rounded-[34px] p-6 sm:p-8">

@@ -2,6 +2,7 @@ package com.example.servicemate.controller;
 
 import com.example.servicemate.dto.BookingRequest;
 import com.example.servicemate.dto.BookingStatusUpdateRequest;
+import com.example.servicemate.dto.CustomerBookingDTO;
 import com.example.servicemate.dto.ProviderBookingDTO;
 import com.example.servicemate.entity.Booking;
 import com.example.servicemate.entity.BookingStatus;
@@ -65,7 +66,23 @@ public class BookingController {
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getBookingsByUser(@PathVariable Integer userId) {
-        return ResponseEntity.ok(bookingRepository.findByUserId(userId));
+        List<Booking> bookings = bookingRepository.findByUserId(userId);
+        Set<Integer> providerIds = bookings.stream()
+                .map(Booking::getProviderId)
+                .collect(Collectors.toSet());
+
+        Map<Integer, User> providersById = userRepository.findAllById(providerIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        List<CustomerBookingDTO> response = bookings.stream()
+                .map(booking -> CustomerBookingDTO.from(booking, providersById.get(booking.getProviderId())))
+                .sorted(Comparator.comparing(
+                        CustomerBookingDTO::getBookingDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ).thenComparing(CustomerBookingDTO::getId, Comparator.reverseOrder()))
+                .toList();
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/provider/{providerId}")

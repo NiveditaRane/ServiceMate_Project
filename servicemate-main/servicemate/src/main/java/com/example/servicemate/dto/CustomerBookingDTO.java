@@ -2,6 +2,7 @@ package com.example.servicemate.dto;
 
 import com.example.servicemate.entity.Booking;
 import com.example.servicemate.entity.BookingStatus;
+import com.example.servicemate.entity.RequestPriority; // Added Import
 import com.example.servicemate.entity.User;
 
 import java.time.LocalDate;
@@ -13,6 +14,7 @@ public class CustomerBookingDTO {
     private Integer providerId;
     private String description;
     private BookingStatus status;
+    private RequestPriority priority; // NEW FIELD
     private LocalDate bookingDate;
     private String providerName;
     private String providerEmail;
@@ -27,6 +29,7 @@ public class CustomerBookingDTO {
         dto.setProviderId(booking.getProviderId());
         dto.setDescription(booking.getDescription());
         dto.setStatus(booking.getStatus());
+        dto.setPriority(booking.getPriority()); // MAP PRIORITY
         dto.setBookingDate(booking.getBookingDate());
 
         if (provider != null) {
@@ -40,91 +43,41 @@ public class CustomerBookingDTO {
         return dto;
     }
 
-    public Integer getId() {
-        return id;
-    }
+    // --- GETTERS AND SETTERS ---
 
-    public void setId(Integer id) {
-        this.id = id;
-    }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
 
-    public Integer getUserId() {
-        return userId;
-    }
+    public Integer getUserId() { return userId; }
+    public void setUserId(Integer userId) { this.userId = userId; }
 
-    public void setUserId(Integer userId) {
-        this.userId = userId;
-    }
+    public Integer getProviderId() { return providerId; }
+    public void setProviderId(Integer providerId) { this.providerId = providerId; }
 
-    public Integer getProviderId() {
-        return providerId;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public void setProviderId(Integer providerId) {
-        this.providerId = providerId;
-    }
+    public BookingStatus getStatus() { return status; }
+    public void setStatus(BookingStatus status) { this.status = status; }
 
-    public String getDescription() {
-        return description;
-    }
+    public RequestPriority getPriority() { return priority; } // NEW GETTER
+    public void setPriority(RequestPriority priority) { this.priority = priority; } // NEW SETTER
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
+    public LocalDate getBookingDate() { return bookingDate; }
+    public void setBookingDate(LocalDate bookingDate) { this.bookingDate = bookingDate; }
 
-    public BookingStatus getStatus() {
-        return status;
-    }
+    public String getProviderName() { return providerName; }
+    public void setProviderName(String providerName) { this.providerName = providerName; }
 
-    public void setStatus(BookingStatus status) {
-        this.status = status;
-    }
+    public String getProviderEmail() { return providerEmail; }
+    public void setProviderEmail(String providerEmail) { this.providerEmail = providerEmail; }
 
-    public LocalDate getBookingDate() {
-        return bookingDate;
-    }
+    public String getProviderPhone() { return providerPhone; }
+    public void setProviderPhone(String providerPhone) { this.providerPhone = providerPhone; }
 
-    public void setBookingDate(LocalDate bookingDate) {
-        this.bookingDate = bookingDate;
-    }
+    public String getProviderCity() { return providerCity; }
+    public void setProviderCity(String providerCity) { this.providerCity = providerCity; }
 
-    public String getProviderName() {
-        return providerName;
-    }
-
-    public void setProviderName(String providerName) {
-        this.providerName = providerName;
-    }
-
-    public String getProviderEmail() {
-        return providerEmail;
-    }
-
-    public void setProviderEmail(String providerEmail) {
-        this.providerEmail = providerEmail;
-    }
-
-    public String getProviderPhone() {
-        return providerPhone;
-    }
-
-    public void setProviderPhone(String providerPhone) {
-        this.providerPhone = providerPhone;
-    }
-
-    public String getProviderCity() {
-        return providerCity;
-    }
-
-    public void setProviderCity(String providerCity) {
-        this.providerCity = providerCity;
-    }
-
-    public String getProviderServiceType() {
-        return providerServiceType;
-    }
-
-    public void setProviderServiceType(String providerServiceType) {
-        this.providerServiceType = providerServiceType;
-    }
+    public String getProviderServiceType() { return providerServiceType; }
+    public void setProviderServiceType(String providerServiceType) { this.providerServiceType = providerServiceType; }
 }

@@ -6,6 +6,7 @@ import com.example.servicemate.dto.CustomerBookingDTO;
 import com.example.servicemate.dto.ProviderBookingDTO;
 import com.example.servicemate.entity.Booking;
 import com.example.servicemate.entity.BookingStatus;
+import com.example.servicemate.entity.RequestPriority; // Added Import
 import com.example.servicemate.entity.User;
 import com.example.servicemate.repository.BookingRepository;
 import com.example.servicemate.repository.UserRepository;
@@ -55,8 +56,24 @@ public class BookingController {
         booking.setDescription(request.getDescription());
         booking.setBookingDate(request.getBookingDate());
         booking.setStatus(BookingStatus.PENDING);
+        // Default priority set here
+        booking.setPriority(RequestPriority.LOW);
 
         return ResponseEntity.ok(bookingRepository.save(booking));
+    }
+
+    // --- NEW ENDPOINT FOR REQUEST PRIORITY FEATURE ---
+    @PutMapping("/{id}/priority")
+    public ResponseEntity<?> updatePriority(
+            @PathVariable Integer id,
+            @RequestParam RequestPriority priority) {
+
+        return bookingRepository.findById(id)
+                .map(booking -> {
+                    booking.setPriority(priority);
+                    return ResponseEntity.ok(bookingRepository.save(booking));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping

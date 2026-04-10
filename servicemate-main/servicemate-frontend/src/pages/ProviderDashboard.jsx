@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Bell, CalendarDays, DollarSign, LoaderCircle, LogOut, Mail, MapPin, MessageSquare,
+  ArrowLeft, Bell, CalendarDays, DollarSign, LoaderCircle, LogOut, Mail, MapPin, MessageSquare,
   PencilLine, Phone, Save, Settings, ShieldCheck, Sparkles, Star, ToggleLeft,
   ToggleRight, UserCircle2,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
+import { useNotifications } from '../hooks/useNotifications';
 
 const labels = {
   plumbing: 'Plumbing',
@@ -42,6 +44,7 @@ const reviews = [
 const statusClass = {
   PENDING: 'border-amber-300/20 bg-amber-300/10 text-amber-200',
   CONFIRMED: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200',
+  COMPLETED: 'border-sky-300/20 bg-sky-300/10 text-sky-200',
   CANCELLED: 'border-rose-300/20 bg-rose-300/10 text-rose-200',
 };
 
@@ -66,10 +69,30 @@ const ProviderDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
+  const [providerView, setProviderView] = useState('dashboard'); // 'dashboard' | 'reviews' | 'performance'
+  const [providerReviews, setProviderReviews] = useState([]);
+
+  useEffect(() => {
+    if (!storedUser?.id) return;
+    api.get(`/api/reviews/provider/${storedUser.id}`)
+      .then((res) => setProviderReviews(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, [storedUser?.id]);
   const [activeBookingId, setActiveBookingId] = useState(null);
   const [editing, setEditing] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [showProfileOverlay, setShowProfileOverlay] = useState(false);
+  const [providerProfileOpen, setProviderProfileOpen] = useState(false);
+  const providerProfileRef = useRef(null);
+  const [providerProfilePos, setProviderProfilePos] = useState({ top: 0, right: 0 });
+
+  const openProviderProfile = () => {
+    if (providerProfileRef.current) {
+      const rect = providerProfileRef.current.getBoundingClientRect();
+      setProviderProfilePos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    }
+    setProviderProfileOpen((o) => !o);
+  };
   const [form, setForm] = useState({
     id: storedUser.id,
     name: storedUser.name || '',
@@ -112,6 +135,8 @@ const ProviderDashboard = () => {
       completion: total ? `${Math.round((confirmed / total) * 100)}%` : '0%',
     };
   }, [bookings]);
+
+  const { notifications: providerNotifs, unreadCount: providerUnread, markAllRead: markProviderRead, clearAll: clearProviderAll } = useNotifications(bookings, 'provider', storedUser?.id);
 
   const profileCompletion = useMemo(() => {
     const keys = ['name', 'email', 'phone', 'serviceType', 'city', 'bio'];
@@ -325,14 +350,50 @@ const ProviderDashboard = () => {
                 <div><p className="text-2xl font-black text-white">ServiceMate</p><p className="text-sm text-slate-400">{labels[form.serviceType] || 'General'} provider workspace</p></div>
               </div>
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setActivePanel((current) => current === 'notifications' ? null : 'notifications')} className={`relative rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300 ${activePanel === 'notifications' ? 'ring-2 ring-sky-400/40' : ''}`}><Bell size={18} />{metrics.pending ? <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-400" /> : null}</button>
-                <button type="button" onClick={() => setActivePanel((current) => current === 'messages' ? null : 'messages')} className={`rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300 ${activePanel === 'messages' ? 'ring-2 ring-sky-400/40' : ''}`}><MessageSquare size={18} /></button>
-                <button type="button" onClick={() => { setActivePanel(null); setEditing(true); setShowProfileOverlay(true); }} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300"><PencilLine size={18} /></button>
-                <button type="button" onClick={() => { clearSession(); navigate('/login', { replace: true }); }} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300"><LogOut size={18} /></button>
-                <button type="button" onClick={() => { setActivePanel(null); setEditing(false); setShowProfileOverlay(true); }} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2"><div><p className="text-sm font-semibold text-white">{form.name || 'Provider'}</p><p className="text-xs text-slate-400">Provider</p></div><div className="flex h-10 w-10 items-center justify-center rounded-full bg-white font-black text-slate-950">{form.name?.[0] || 'P'}</div></button>
+                <button type="button" onClick={() => { setActivePanel((current) => { const next = current === 'notifications' ? null : 'notifications'; if (next === 'notifications') markProviderRead(); return next; }); }} className={`relative rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300 ${activePanel === 'notifications' ? 'ring-2 ring-sky-400/40' : ''}`}><Bell size={18} />{providerUnread > 0 ? <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-rose-400 text-[10px] font-black text-white">{providerUnread}</span> : null}</button>
+                <div ref={providerProfileRef}>
+                  <button type="button" onClick={openProviderProfile} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 transition hover:bg-white/[0.08]">
+                    <div><p className="text-sm font-semibold text-white">{form.name || 'Provider'}</p><p className="text-xs text-slate-400">Provider</p></div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white font-black text-slate-950">{form.name?.[0] || 'P'}</div>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Provider profile dropdown portal */}
+          {createPortal(
+            <AnimatePresence>
+              {providerProfileOpen && (
+                <>
+                  <div className="fixed inset-0 z-[9998]" onClick={() => setProviderProfileOpen(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    style={{ position: 'fixed', top: providerProfilePos.top, right: providerProfilePos.right, zIndex: 9999 }}
+                    className="w-56 rounded-2xl border border-white/10 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl"
+                  >
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setActivePanel(null); setEditing(false); setShowProfileOverlay(true); setProviderProfileOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]">
+                      <Settings size={16} className="text-sky-400" /> Manage Account
+                    </button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setProviderView('reviews'); setProviderProfileOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]">
+                      <Star size={16} className="text-amber-400" /> Reviews
+                    </button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setProviderView('performance'); setProviderProfileOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]">
+                      <BarChart3 size={16} className="text-emerald-400" /> Performance Overview
+                    </button>
+                    <div className="my-1 border-t border-white/10" />
+                    <button type="button" onClick={(e) => { e.stopPropagation(); clearSession(); navigate('/login', { replace: true }); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-rose-400 transition hover:bg-rose-500/10">
+                      <LogOut size={16} /> Logout
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>,
+            document.body
+          )}
 
           <AnimatePresence>
             {showProfileOverlay ? (
@@ -388,7 +449,90 @@ const ProviderDashboard = () => {
             ) : null}
           </AnimatePresence>
 
-          <section className="mb-6 rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
+          {providerView === 'reviews' && (
+            <section className="rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
+              <button type="button" onClick={() => setProviderView('dashboard')} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-sky-400"><ArrowLeft size={16} /> Back to dashboard</button>
+              <p className="text-sm uppercase tracking-[0.18em] text-amber-300">Reviews</p>
+              <h2 className="mt-2 text-3xl font-black text-white mb-6">Recent Reviews</h2>
+              <div className="space-y-5 max-w-2xl">
+                {providerReviews.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-black/20 px-6 py-12 text-center text-slate-400">No reviews yet.</div>
+                ) : providerReviews.map((r) => (
+                  <div key={r.id} className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.07] text-slate-300"><UserCircle2 size={22} /></div>
+                        <div><p className="font-semibold text-white">{r.customerName || 'Customer'}</p><p className="text-xs text-slate-400 mt-0.5">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : ''}</p></div>
+                      </div>
+                      <div className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={16} className={i < r.rating ? 'text-amber-400' : 'text-slate-600'} fill={i < r.rating ? 'currentColor' : 'none'} />)}</div>
+                    </div>
+                    <p className="mt-4 text-sm text-slate-300 leading-7">{r.comment}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {providerView === 'performance' && (
+            <section className="rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
+              <button type="button" onClick={() => setProviderView('dashboard')} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-sky-400"><ArrowLeft size={16} /> Back to dashboard</button>
+              <p className="text-sm uppercase tracking-[0.18em] text-emerald-300">Analytics</p>
+              <h2 className="mt-2 text-3xl font-black text-white mb-6">Performance Overview</h2>
+              <div className="grid grid-cols-2 gap-4 mb-8 sm:grid-cols-3">
+                {[['Completed Jobs', metrics.confirmed], ['Total Bookings', metrics.total], ['Pending', metrics.pending], ['Completion Rate', metrics.completion], ['Avg Rating', '4.8'], ['Profile Score', `${profileCompletion}%`]].map(([k, v]) => (
+                  <div key={k} className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                    <p className="text-xs text-slate-400">{k}</p>
+                    <p className="mt-2 text-3xl font-black text-white">{v}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={statsChartData}>
+                    <defs>
+                      <linearGradient id="perfGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#06b6d4" />
+                        <stop offset="100%" stopColor="#a855f7" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="name" stroke="#94a3b8" tick={{ fill: '#cbd5f5', fontSize: 12 }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }} />
+                    <Line type="monotone" dataKey="value" stroke="url(#perfGradient)" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} animationDuration={1200} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <h3 className="mt-8 text-xl font-black text-white">This Month</h3>
+              <div className="mt-4 h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyData}>
+                    <defs>
+                      <linearGradient id="areaGradient2" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.8}/>
+                        <stop offset="100%" stopColor="#a855f7" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="name" stroke="#94a3b8" tick={{ fill: '#cbd5f5', fontSize: 11 }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }} />
+                    <Area type="monotone" dataKey="earnings" stroke="#6366f1" fill="url(#areaGradient2)" strokeWidth={3} animationDuration={1200} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {[['Completed Jobs', metrics.confirmed], ['Hours Worked', metrics.confirmed * 3], ['Avg Response', avgResponseTime], ['Profile Score', `${profileCompletion}%`]].map(([k, v]) => (
+                  <div key={k} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                    <p className="text-xs text-slate-400">{k}</p>
+                    <p className="mt-1 text-2xl font-black text-white">{v}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {providerView === 'dashboard' && (<>
+            <section className="mb-6 rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200"><Sparkles size={14} /> Provider Dashboard</div><h1 className="text-3xl font-black text-white sm:text-5xl">Welcome back, {form.name || 'Service Professional'}</h1><p className="mt-3 max-w-2xl text-sm text-slate-300">Manage bookings, review performance, and keep your profile polished from one workspace.</p></div>
               <button
@@ -419,96 +563,35 @@ const ProviderDashboard = () => {
                 <span>{availabilitySaving ? 'Updating...' : form.availability ? 'Available for new jobs' : 'Currently offline'}</span>
               </button>
             </div>
-          </section>
+            </section>
 
           <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {statStyles.map(([fallbackValue, label, change, Icon, tint], index) => {
               const value = label === 'Active Bookings' ? metrics.total : label === 'Completion Rate' ? metrics.completion : fallbackValue;
-              return <motion.div key={label} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }} className={`rounded-[30px] border border-white/10 bg-gradient-to-br ${tint} to-black/20 p-6 backdrop-blur-xl`}><div className="mb-6 flex items-start justify-between"><div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] text-white"><Icon size={24} /></div><span className="text-sm font-semibold text-emerald-300">{change || `+${metrics.pending}`}</span></div><p className="text-4xl font-black text-white">{value}</p><p className="mt-2 text-base text-slate-400">{label}</p></motion.div>;
+              return <motion.div key={label} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }} className="rounded-[30px] border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-xl"><div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-slate-400"><Icon size={22} /></div><p className="text-4xl font-black text-white">{value}</p><p className="mt-2 text-sm text-slate-500">{label}</p></motion.div>;
             })}
           </section>
-          <section className="mb-6 rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl">
-            <h2 className="text-2xl font-black text-white mb-4">
-              Performance Overview
-            </h2>
 
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={statsChartData}>
-
-                  {/* 🔥 Gradient Line */}
-                  <defs>
-                    <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#06b6d4" />
-                      <stop offset="50%" stopColor="#6366f1" />
-                      <stop offset="100%" stopColor="#a855f7" />
-                    </linearGradient>
-                  </defs>
-
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-
-                  <XAxis
-                      dataKey="name"
-                      stroke="#94a3b8"
-                      tick={{ fill: '#cbd5f5', fontSize: 12 }}
-                  />
-
-                  <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#0f172a',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '10px',
-                        color: '#fff'
-                      }}
-                  />
-
-                  <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke="url(#lineGradient)"
-                      strokeWidth={3}
-                      dot={{ r: 5 }}
-                      activeDot={{ r: 7 }}
-                      animationDuration={1200}
-                      style={{ filter: 'drop-shadow(0px 0px 8px rgba(99,102,241,0.6))' }}
-                  />
-
-                </LineChart>
-              </ResponsiveContainer>
-
-            </div>
-          </section>
-
-          <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+          <div className={`grid gap-6 ${activePanel ? 'xl:grid-cols-[2fr_1fr]' : 'xl:grid-cols-1'}`}>
             <div className="space-y-6">
-              <section className="mb-6 rounded-[30px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl">
+              <section className="mb-6 rounded-[30px] border border-white/[0.08] bg-white/[0.03] p-5 backdrop-blur-xl">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-white font-bold text-lg">Today's Summary</h3>
-                  <span className="text-xs text-slate-400">
-      {new Date().toLocaleDateString('en-IN')}
-    </span>
+                  <span className="text-xs text-slate-500">{new Date().toLocaleDateString('en-IN')}</span>
                 </div>
-
                 <div className="grid grid-cols-3 gap-4 text-center">
-
-                  {/* Total */}
-                  <div className="rounded-2xl bg-black/30 p-3">
+                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
                     <p className="text-2xl font-black text-white">{todayStats.total}</p>
-                    <p className="text-xs text-slate-400">Jobs</p>
+                    <p className="text-xs text-slate-500">Jobs</p>
                   </div>
-
-                  {/* Pending */}
-                  <div className="rounded-2xl bg-amber-400/10 border border-amber-400/20 p-3">
-                    <p className="text-2xl font-black text-amber-300">{todayStats.pending}</p>
-                    <p className="text-xs text-slate-400">Pending</p>
+                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
+                    <p className="text-2xl font-black text-slate-200">{todayStats.pending}</p>
+                    <p className="text-xs text-slate-500">Pending</p>
                   </div>
-
-                  {/* Completed */}
-                  <div className="rounded-2xl bg-emerald-400/10 border border-emerald-400/20 p-3">
-                    <p className="text-2xl font-black text-emerald-300">{todayStats.confirmed}</p>
-                    <p className="text-xs text-slate-400">Completed</p>
+                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
+                    <p className="text-2xl font-black text-slate-200">{todayStats.confirmed}</p>
+                    <p className="text-xs text-slate-500">Completed</p>
                   </div>
-
                 </div>
               </section>
               <section className="overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl">
@@ -528,9 +611,14 @@ const ProviderDashboard = () => {
                     return (
                         <tr key={b.id} className="border-t border-white/8 text-sm text-slate-300">
                           <td className="px-6 py-5 sm:px-8">
-                            <p className="font-semibold text-white">
-                              {b.description || 'Customer request'}
-                            </p>
+                            <div className="flex flex-col gap-1">
+                              {b.description?.startsWith('[PRIORITY]') && (
+                                <span className="inline-flex w-fit items-center gap-1 rounded-full border border-rose-400/30 bg-rose-400/10 px-2 py-0.5 text-xs font-bold text-rose-300">Priority</span>
+                              )}
+                              <p className="font-semibold text-white">
+                                {b.description?.startsWith('[PRIORITY]') ? b.description.replace('[PRIORITY]', '').trim() : (b.description || 'Customer request')}
+                              </p>
+                            </div>
                             <p className="mt-1 text-xs text-slate-500">
                               {labels[form.serviceType] || 'General service'}
                             </p>
@@ -606,81 +694,35 @@ const ProviderDashboard = () => {
                   </tbody></table></div>}
               </section>
 
-              <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-                <section className="rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
-                  <div className="mb-6"><h2 className="text-3xl font-black text-white">Recent Reviews</h2><p className="mt-2 text-sm text-slate-400">What clients are saying</p></div>
-                  <div className="space-y-5">{reviews.map(([name, date, rating, note]) => <div key={`${name}-${date}`} className="border-t border-white/8 pt-5 first:border-t-0 first:pt-0"><div className="flex items-start justify-between gap-4"><div className="flex items-start gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.07] text-slate-300"><UserCircle2 size={22} /></div><div><p className="text-xl font-semibold text-white">{name}</p><p className="text-sm text-slate-500">{date}</p></div></div><div className="flex items-center gap-1 text-amber-300">{Array.from({ length: 5 }).map((_, i) => <Star key={`${name}-${i}`} size={18} className={i < rating ? 'fill-current' : 'text-slate-600'} />)}</div></div><p className="mt-4 text-base leading-7 text-slate-300">{note}</p></div>)}</div>
-                </section>
-
-                <section className="rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
-                  <h2 className="text-3xl font-black text-white">This Month</h2>
-
-                  {/* 📈 Animated Area Chart */}
-                  <div className="mt-6 h-40">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={monthlyData}>
-
-                        <defs>
-                          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.8}/>
-                            <stop offset="100%" stopColor="#a855f7" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-
-                        <XAxis
-                            dataKey="name"
-                            stroke="#94a3b8"
-                            tick={{ fill: '#cbd5f5', fontSize: 11 }}
-                        />
-
-                        <Tooltip
-                            contentStyle={{
-                              backgroundColor: '#0f172a',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              borderRadius: '10px',
-                              color: '#fff'
-                            }}
-                        />
-
-                        <Area
-                            type="monotone"
-                            dataKey="earnings"
-                            stroke="#6366f1"
-                            fill="url(#areaGradient)"
-                            strokeWidth={3}
-                            animationDuration={1200}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* 📊 Stats Cards */}
-                  <div className="mt-6 grid grid-cols-2 gap-4">
-                    {[
-                      ['Completed Jobs', metrics.confirmed],
-                      ['Hours Worked', metrics.confirmed * 3],
-                      ['Avg Response', avgResponseTime],
-                      ['Profile Score', `${profileCompletion}%`],
-                    ].map(([k, v]) => (
-                        <div key={k} className="rounded-2xl border border-white/10 bg-black/30 p-3">
-                          <p className="text-xs text-slate-400">{k}</p>
-                          <p className="text-lg font-bold text-white">{v}</p>
-                        </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
             </div>
 
             <aside className="space-y-6">
               {activePanel === 'notifications' ? (
                   <section className="rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
-                    <div className="mb-5 flex items-center justify-between"><div><p className="text-sm uppercase tracking-[0.18em] text-cyan-300">Notifications</p><h2 className="mt-2 text-2xl font-black text-white">Recent Alerts</h2></div><button type="button" onClick={() => setActivePanel(null)} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white">Close</button></div>
+                    <div className="mb-5 flex items-center justify-between">
+                      <div><p className="text-sm uppercase tracking-[0.18em] text-cyan-300">Notifications</p><h2 className="mt-2 text-2xl font-black text-white">Recent Alerts</h2></div>
+                      <div className="flex items-center gap-3">
+                        {providerNotifs.length > 0 && (
+                          <button type="button" onClick={clearProviderAll} className="text-xs font-semibold text-cyan-300 transition hover:text-white">Clear all</button>
+                        )}
+                        <button type="button" onClick={() => setActivePanel(null)} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white">Close</button>
+                      </div>
+                    </div>
                     <div className="space-y-3">
-                      {metrics.pending ? <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300"><p className="font-semibold text-white">{metrics.pending} pending booking request{metrics.pending > 1 ? 's' : ''}</p><p className="mt-1 text-slate-400">Review the booking table and respond to new customers.</p></div> : <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300">No new notifications right now.</div>}
-                      <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300"><p className="font-semibold text-white">Availability status</p><p className="mt-1 text-slate-400">{form.availability ? 'You are visible for new bookings.' : 'You are currently offline for new bookings.'}</p></div>
+                      {providerNotifs.length === 0 ? (
+                        <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-400">No new notifications right now.</div>
+                      ) : (
+                        providerNotifs.map((n) => (
+                          <div key={n.id} className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm">
+                            <p className="font-semibold text-white">{n.title}</p>
+                            <p className="mt-1 text-slate-300">{n.body}</p>
+                          </div>
+                        ))
+                      )}
+                      <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-sm text-slate-300">
+                        <p className="font-semibold text-white">Availability status</p>
+                        <p className="mt-1 text-slate-400">{form.availability ? 'You are visible for new bookings.' : 'You are currently offline for new bookings.'}</p>
+                      </div>
                     </div>
                   </section>
               ) : null}
@@ -694,70 +736,64 @@ const ProviderDashboard = () => {
                   </section>
               ) : null}
 
-              <section className="rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
-                <div className="mb-5"><h2 className="text-2xl font-black text-white">Schedule Snapshot</h2><p className="mt-2 text-sm text-slate-400">Booked request volume by day.</p></div>
-                <div className="space-y-4">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => { const count = bookings.filter((b) => b.bookingDate && new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date(`${b.bookingDate}T00:00:00`)) === day).length; return <div key={day}><div className="mb-2 flex items-center justify-between text-sm text-slate-300"><span>{day}</span><span>{count} jobs</span></div><div className="h-2 rounded-full bg-white/5"><div className="theme-progress-fill h-2 rounded-full" style={{ width: `${Math.min(count * 20, 100)}%` }} /></div></div>; })}</div>
-              </section>
-              <section className="rounded-[30px] border border-white/10 bg-white/[0.04] p-6">
-                <h2 className="text-xl font-bold text-white mb-4">Recent Activity</h2>
-                <div className="space-y-3 text-sm text-slate-300">
-                  {recentActivity.map((a, i) => <p key={i}>{a}</p>)}
-                </div>
-              </section>
+              {activePanel === 'reviews' ? null : null}
+              {activePanel === 'performance' ? null : null}
 
-              <section
-                  className={`rounded-[30px] p-5 border ${
-                      smartInsight.type === 'success'
-                          ? 'border-emerald-400/20 bg-emerald-400/10'
-                          : smartInsight.type === 'warning'
-                              ? 'border-amber-400/20 bg-amber-400/10'
-                              : smartInsight.type === 'danger'
-                                  ? 'border-rose-400/20 bg-rose-400/10'
-                                  : 'border-cyan-400/20 bg-cyan-400/10'
-                  }`}
-              >
-                <div className="flex items-center gap-2 font-bold text-white">
-                  <Sparkles size={16} />
-                  Smart Insight
-                </div>
 
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {smartInsight.message}
-                </p>
-
-                <p className="text-sm text-slate-300 mt-1">
-                  {smartInsight.action}
-                </p>
-              </section>
             </aside>
           </div>
+          </>)}
         </div>
         <AnimatePresence>
           {selectedBooking && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="bg-slate-900 p-6 rounded-2xl w-full max-w-md border border-white/10"
-                >
-                  <h2 className="text-xl font-bold text-white mb-4">
-                    Booking Details
-                  </h2>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.97 }}
+                className="w-full max-w-md rounded-[2rem] border border-white/10 bg-slate-900 p-8 shadow-2xl"
+              >
+                <div className="mb-6 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-400">Booking Details</p>
+                    <h2 className="mt-2 text-2xl font-black text-white">{selectedBooking.customerName || 'Customer'}</h2>
+                    <p className="mt-1 text-sm text-slate-400">{selectedBooking.customerCity || 'City not provided'}</p>
+                  </div>
+                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${
+                    selectedBooking.status === 'CONFIRMED' ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200' :
+                    selectedBooking.status === 'PENDING' ? 'border-amber-300/20 bg-amber-300/10 text-amber-200' :
+                    'border-rose-300/20 bg-rose-300/10 text-rose-200'
+                  }`}>{selectedBooking.status}</span>
+                </div>
 
-                  <p className="text-white">Customer: {selectedBooking.customerName}</p>
-                  <p className="text-white">Service: {selectedBooking.description}</p>
-                  <p className="text-white">Date: {formatDate(selectedBooking.bookingDate)}</p>
-                  <p className="text-white">Status: {selectedBooking.status}</p>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
+                    <Mail size={15} className="text-cyan-400 shrink-0" />
+                    <span className="text-slate-300">{selectedBooking.customerEmail || 'Email not available'}</span>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
+                    <Phone size={15} className="text-cyan-400 shrink-0" />
+                    <span className="text-slate-300">{selectedBooking.customerPhone ? `+91 ${selectedBooking.customerPhone}` : 'Phone not available'}</span>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
+                    <CalendarDays size={15} className="text-cyan-400 shrink-0" />
+                    <span className="text-slate-300">{formatDate(selectedBooking.bookingDate)}</span>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
+                    <p className="mb-1 text-xs text-slate-500">Description</p>
+                    <p className="text-slate-300 leading-6">
+                      {selectedBooking.description?.startsWith('[PRIORITY]')
+                        ? selectedBooking.description.replace('[PRIORITY]', '').trim()
+                        : selectedBooking.description || 'No description provided.'}
+                    </p>
+                  </div>
+                </div>
 
-                  <button
-                      onClick={() => setSelectedBooking(null)}
-                      className="mt-4 bg-white text-black px-4 py-2 rounded-lg"
-                  >
-                    Close
-                  </button>
-                </motion.div>
-              </div>
+                <button type="button" onClick={() => setSelectedBooking(null)} className="mt-6 w-full rounded-2xl border border-white/10 bg-white/[0.06] py-3 text-sm font-semibold text-white transition hover:bg-white/[0.1]">
+                  Close
+                </button>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </LiveBackground>

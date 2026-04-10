@@ -168,10 +168,12 @@
   }
 
   .theme-background-overlay {
+    pointer-events: none;
     background: var(--bg-overlay);
   }
 
   .theme-grid {
+    pointer-events: none;
     opacity: 0.38;
     background-image:
       linear-gradient(var(--grid-line) 1px, transparent 1px),
@@ -180,14 +182,17 @@
   }
 
   .theme-orb-primary {
+    pointer-events: none;
     background: var(--orb-primary);
   }
 
   .theme-orb-secondary {
+    pointer-events: none;
     background: var(--orb-secondary);
   }
 
   .theme-orb-tertiary {
+    pointer-events: none;
     background: var(--orb-tertiary);
   }
 

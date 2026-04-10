@@ -41,6 +41,32 @@ public class AuthController {
         return user;
     }
 
+    private String normalizeName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim().replaceAll("\\s+", " ");
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        String[] parts = trimmed.split(" ");
+        StringBuilder normalized = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (normalized.length() > 0) {
+                normalized.append(' ');
+            }
+            normalized.append(part.substring(0, 1).toUpperCase());
+            if (part.length() > 1) {
+                normalized.append(part.substring(1).toLowerCase());
+            }
+        }
+        return normalized.toString();
+    }
+
     // 1. SEND OTP FOR SIGNUP
     @PostMapping("/signup-otp")
     public ResponseEntity<?> sendSignupOtp(@RequestBody Map<String, String> request) {
@@ -63,18 +89,26 @@ public class AuthController {
     public ResponseEntity<?> registerUser(@RequestBody UserDTO userDTO) {
         String email = userDTO.getEmail().toLowerCase().trim();
         if (userRepository.existsByEmail(email)) return ResponseEntity.status(400).body("Email in use!");
+        String normalizedName = normalizeName(userDTO.getName());
+        String trimmedCity = userDTO.getCity() == null ? "" : userDTO.getCity().trim();
+        if (normalizedName.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Name is required");
+        }
 
         User user = new User();
-        user.setName(userDTO.getName());
+        user.setName(normalizedName);
         user.setEmail(email);
         user.setPhone(userDTO.getPhone());
         user.setRole(userDTO.getRole().toLowerCase());
         user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         if ("provider".equals(user.getRole())) {
+            if (trimmedCity.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("City is required for providers");
+            }
             user.setServiceType(userDTO.getServiceType());
             user.setAvailability(Boolean.TRUE);
         }
-        user.setCity(userDTO.getCity());
+        user.setCity(trimmedCity.isEmpty() ? null : trimmedCity);
         user.setBio(userDTO.getBio());
 
         userRepository.save(user);
@@ -185,7 +219,7 @@ public class AuthController {
 
         User user = userOpt.get();
 
-        String trimmedName = profileDTO.getName() == null ? "" : profileDTO.getName().trim();
+        String trimmedName = normalizeName(profileDTO.getName());
         String trimmedPhone = profileDTO.getPhone() == null ? "" : profileDTO.getPhone().trim();
         String trimmedServiceType = profileDTO.getServiceType() == null ? null : profileDTO.getServiceType().trim();
         String trimmedCity = profileDTO.getCity() == null ? null : profileDTO.getCity().trim();
@@ -211,6 +245,9 @@ public class AuthController {
         if ("provider".equalsIgnoreCase(user.getRole())) {
             if (trimmedServiceType == null || trimmedServiceType.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Service type is required");
+            }
+            if (trimmedCity == null || trimmedCity.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("City is required for providers");
             }
             user.setServiceType(trimmedServiceType);
             if (profileDTO.getAvailability() != null) {

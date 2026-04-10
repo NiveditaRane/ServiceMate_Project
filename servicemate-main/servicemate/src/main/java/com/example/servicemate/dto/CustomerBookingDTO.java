@@ -2,6 +2,7 @@ package com.example.servicemate.dto;
 
 import com.example.servicemate.entity.Booking;
 import com.example.servicemate.entity.BookingStatus;
+import com.example.servicemate.entity.Review;
 import com.example.servicemate.entity.User;
 
 import java.time.LocalDate;
@@ -19,8 +20,11 @@ public class CustomerBookingDTO {
     private String providerPhone;
     private String providerCity;
     private String providerServiceType;
+    private boolean reviewSubmitted;
+    private Integer reviewRating;
+    private String reviewComment;
 
-    public static CustomerBookingDTO from(Booking booking, User provider) {
+    public static CustomerBookingDTO from(Booking booking, User provider, Review review) {
         CustomerBookingDTO dto = new CustomerBookingDTO();
         dto.setId(booking.getId());
         dto.setUserId(booking.getUserId());
@@ -35,6 +39,12 @@ public class CustomerBookingDTO {
             dto.setProviderPhone(provider.getPhone());
             dto.setProviderCity(provider.getCity());
             dto.setProviderServiceType(provider.getServiceType());
+        }
+
+        if (review != null) {
+            dto.setReviewSubmitted(true);
+            dto.setReviewRating(review.getRating());
+            dto.setReviewComment(review.getComment());
         }
 
         return dto;
@@ -126,5 +136,29 @@ public class CustomerBookingDTO {
 
     public void setProviderServiceType(String providerServiceType) {
         this.providerServiceType = providerServiceType;
+    }
+
+    public boolean isReviewSubmitted() {
+        return reviewSubmitted;
+    }
+
+    public void setReviewSubmitted(boolean reviewSubmitted) {
+        this.reviewSubmitted = reviewSubmitted;
+    }
+
+    public Integer getReviewRating() {
+        return reviewRating;
+    }
+
+    public void setReviewRating(Integer reviewRating) {
+        this.reviewRating = reviewRating;
+    }
+
+    public String getReviewComment() {
+        return reviewComment;
+    }
+
+    public void setReviewComment(String reviewComment) {
+        this.reviewComment = reviewComment;
     }
 }

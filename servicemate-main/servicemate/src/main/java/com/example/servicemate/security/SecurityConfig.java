@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/providers/**").permitAll()
                         .requestMatchers("/api/bookings/**").permitAll()
+                        .requestMatchers("/api/reviews/**").permitAll()
                         .requestMatchers("/error").permitAll() // ✅ avoid hidden 403
                         .anyRequest().authenticated()
                 )

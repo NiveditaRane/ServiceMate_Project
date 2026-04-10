@@ -6,8 +6,10 @@ import com.example.servicemate.dto.CustomerBookingDTO;
 import com.example.servicemate.dto.ProviderBookingDTO;
 import com.example.servicemate.entity.Booking;
 import com.example.servicemate.entity.BookingStatus;
+import com.example.servicemate.entity.Review;
 import com.example.servicemate.entity.User;
 import com.example.servicemate.repository.BookingRepository;
+import com.example.servicemate.repository.ReviewRepository;
 import com.example.servicemate.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -27,11 +29,14 @@ public class BookingController {
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
 
     public BookingController(BookingRepository bookingRepository,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             ReviewRepository reviewRepository) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
+        this.reviewRepository = reviewRepository;
     }
 
     @PostMapping("/create")
@@ -73,9 +78,17 @@ public class BookingController {
 
         Map<Integer, User> providersById = userRepository.findAllById(providerIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
+        Map<Integer, Review> reviewsByBookingId = reviewRepository.findByBookingIdIn(
+                        bookings.stream().map(Booking::getId).toList()
+                ).stream()
+                .collect(Collectors.toMap(Review::getBookingId, Function.identity()));
 
         List<CustomerBookingDTO> response = bookings.stream()
-                .map(booking -> CustomerBookingDTO.from(booking, providersById.get(booking.getProviderId())))
+                .map(booking -> CustomerBookingDTO.from(
+                        booking,
+                        providersById.get(booking.getProviderId()),
+                        reviewsByBookingId.get(booking.getId())
+                ))
                 .sorted(Comparator.comparing(
                         CustomerBookingDTO::getBookingDate,
                         Comparator.nullsLast(Comparator.reverseOrder())

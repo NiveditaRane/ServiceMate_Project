@@ -45,6 +45,12 @@ const statusClass = {
   CANCELLED: 'border-rose-300/20 bg-rose-300/10 text-rose-200',
 };
 
+const priorityClass = {
+  HIGH: 'border-rose-300/20 bg-rose-300/10 text-rose-200',
+  MEDIUM: 'border-amber-300/20 bg-amber-300/10 text-amber-200',
+  LOW: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-200',
+};
+
 
 
 const formatDate = (value, opts = { day: '2-digit', month: 'short', year: 'numeric' }) =>
@@ -565,14 +571,23 @@ const ProviderDashboard = () => {
                           </td>
 
                           <td className="px-6 py-5">
-          <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                  statusClass[b.status] ||
-                  'border-white/10 bg-white/5 text-slate-200'
-              }`}
-          >
-            {b.status}
-          </span>
+                            <div className="flex flex-col items-start gap-2">
+                              <span
+                                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+                                      statusClass[b.status] ||
+                                      'border-white/10 bg-white/5 text-slate-200'
+                                  }`}
+                              >
+                                {b.status}
+                              </span>
+                              <span
+                                  className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${
+                                      priorityClass[b.priority] || priorityClass.LOW
+                                  }`}
+                              >
+                                Priority
+                              </span>
+                            </div>
                           </td>
 
                           <td className="px-6 py-5">
@@ -749,6 +764,7 @@ const ProviderDashboard = () => {
                   <p className="text-white">Service: {selectedBooking.description}</p>
                   <p className="text-white">Date: {formatDate(selectedBooking.bookingDate)}</p>
                   <p className="text-white">Status: {selectedBooking.status}</p>
+                  <p className="text-white">Priority: {selectedBooking.priority || 'LOW'}</p>
 
                   <button
                       onClick={() => setSelectedBooking(null)}

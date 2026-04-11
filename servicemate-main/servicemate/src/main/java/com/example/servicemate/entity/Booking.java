@@ -14,6 +14,7 @@ public class Booking {
     private Integer providerId;
 
     @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(20)")
     private BookingStatus status;
 
     private String description;

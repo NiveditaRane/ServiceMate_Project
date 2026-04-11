@@ -37,6 +37,9 @@ public class User {
     @Column(name = "bio", length = 1000)
     private String bio;
 
+    @Column(name = "price")
+    private Integer price;
+
     @Column(name = "availability", nullable = false)
     private Boolean availability = true;
 
@@ -67,6 +70,9 @@ public class User {
 
     public String getBio() { return bio; }
     public void setBio(String bio) { this.bio = bio; }
+
+    public Integer getPrice() { return price; }
+    public void setPrice(Integer price) { this.price = price; }
 
     public Boolean getAvailability() { return availability; }
     public void setAvailability(Boolean availability) { this.availability = availability; }

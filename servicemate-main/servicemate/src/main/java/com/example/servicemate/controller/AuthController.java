@@ -241,6 +241,9 @@ public class AuthController {
         user.setPhone(trimmedPhone);
         user.setCity(trimmedCity);
         user.setBio(trimmedBio);
+        if (profileDTO.getPrice() != null) {
+            user.setPrice(profileDTO.getPrice());
+        }
 
         if ("provider".equalsIgnoreCase(user.getRole())) {
             if (trimmedServiceType == null || trimmedServiceType.isEmpty()) {

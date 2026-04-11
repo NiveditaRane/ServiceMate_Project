@@ -47,8 +47,8 @@ public class ReviewController {
             return ResponseEntity.badRequest().body("Review does not match the booking");
         }
 
-        if (booking.getStatus() != BookingStatus.CONFIRMED) {
-            return ResponseEntity.badRequest().body("Only confirmed bookings can be reviewed");
+        if (booking.getStatus() != BookingStatus.CONFIRMED && booking.getStatus() != BookingStatus.COMPLETED) {
+            return ResponseEntity.badRequest().body("Only confirmed or completed bookings can be reviewed");
         }
 
         if (reviewRepository.findByBookingId(request.getBookingId()).isPresent()) {

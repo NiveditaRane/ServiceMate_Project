@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft, Bell, CalendarDays, DollarSign, LoaderCircle, LogOut, Mail, MapPin, MessageSquare,
   PencilLine, Phone, Save, Settings, ShieldCheck, Sparkles, Star, ToggleLeft,
-  ToggleRight, UserCircle2,
+  ToggleRight, UserCircle2, X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -64,12 +64,25 @@ const ProviderDashboard = () => {
   const availabilityKey = `provider-availability:${storedUser.id ?? storedUser.email ?? 'unknown'}`;
   const persistedAvailability = localStorage.getItem(availabilityKey);
   const [showAllBookings, setShowAllBookings] = useState(false);
+  const [bookingTab, setBookingTab] = useState('confirmed'); // 'pending' | 'confirmed'
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
-  const [providerView, setProviderView] = useState('dashboard'); // 'dashboard' | 'reviews' | 'performance'
+  const [providerView, setProviderView] = useState('dashboard');
+  const [analyticsTab, setAnalyticsTab] = useState('thismonth'); // 'dashboard' | 'reviews' | 'performance'
+  const [bellProviderOpen, setBellProviderOpen] = useState(false);
+  const bellProviderRef = useRef(null);
+  const [bellProviderPos, setBellProviderPos] = useState({ top: 0, right: 0 });
+
+  const openBellProvider = () => {
+    if (bellProviderRef.current) {
+      const rect = bellProviderRef.current.getBoundingClientRect();
+      setBellProviderPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    }
+    setBellProviderOpen((o) => { if (!o) markProviderRead(); return !o; });
+  };
   const [providerReviews, setProviderReviews] = useState([]);
 
   useEffect(() => {
@@ -101,6 +114,7 @@ const ProviderDashboard = () => {
     serviceType: storedUser.serviceType || 'electrical',
     city: storedUser.city || '',
     bio: storedUser.bio || '',
+    price: storedUser.price || '',
     availability:
         typeof storedUser.availability === 'boolean'
             ? storedUser.availability
@@ -127,12 +141,14 @@ const ProviderDashboard = () => {
   const metrics = useMemo(() => {
     const total = bookings.length;
     const confirmed = bookings.filter((b) => b.status === 'CONFIRMED').length;
+    const completed = bookings.filter((b) => b.status === 'COMPLETED').length;
     const pending = bookings.filter((b) => b.status === 'PENDING').length;
     return {
       total,
       confirmed,
+      completed,
       pending,
-      completion: total ? `${Math.round((confirmed / total) * 100)}%` : '0%',
+      completion: total ? `${Math.round(((confirmed + completed) / total) * 100)}%` : '0%',
     };
   }, [bookings]);
 
@@ -146,30 +162,36 @@ const ProviderDashboard = () => {
   // 🔥 Dynamic Earnings
   const totalEarnings = useMemo(() => {
     return bookings
-        .filter(b => b.status === 'CONFIRMED')
+        .filter(b => b.status === 'CONFIRMED' || b.status === 'COMPLETED')
         .reduce((sum, b) => sum + (b.amount || 500), 0);
   }, [bookings]);
+
+  const avgRating = useMemo(() => {
+    if (!providerReviews.length) return 'N/A';
+    const avg = providerReviews.reduce((sum, r) => sum + r.rating, 0) / providerReviews.length;
+    return avg.toFixed(1);
+  }, [providerReviews]);
 
   const statStyles = useMemo(() => [
     [`₹ ${totalEarnings}`, 'Total Earnings', '+12%', DollarSign, 'from-emerald-300/20'],
     [null, 'Active Bookings', null, CalendarDays, 'from-cyan-300/20'],
-    ['4.8', 'Avg Rating', '+0.2', Star, 'from-amber-300/20'],
+    [avgRating, 'Avg Rating', null, Star, 'from-amber-300/20'],
     [null, 'Completion Rate', null, ShieldCheck, 'from-violet-300/20'],
-  ], [totalEarnings]);
+  ], [totalEarnings, avgRating]);
 
   const statsChartData = useMemo(() => [
     { name: 'Earnings', value: totalEarnings },
     { name: 'Bookings', value: metrics.total * 100 },
-    { name: 'Rating', value: 4.8 * 100 },
+    { name: 'Rating', value: avgRating === 'N/A' ? 0 : parseFloat(avgRating) * 100 },
     { name: 'Completion', value: parseInt(metrics.completion) * 10 },
-  ], [totalEarnings, metrics]);
+  ], [totalEarnings, metrics, avgRating]);
 
 // 📊 Monthly earnings graph
   const monthlyData = useMemo(() => {
     const map = {};
 
     bookings.forEach((b) => {
-      if (b.status === 'CONFIRMED' && b.bookingDate) {
+      if ((b.status === 'CONFIRMED' || b.status === 'COMPLETED') && b.bookingDate) {
         const month = new Date(b.bookingDate).toLocaleString('en-IN', { month: 'short' });
         map[month] = (map[month] || 0) + (b.amount || 500);
       }
@@ -243,7 +265,6 @@ const ProviderDashboard = () => {
     };
   }, [bookings]);
 
-// ⏱️ Response Time
   const avgResponseTime = useMemo(() => {
     if (!bookings.length) return 'N/A';
     return `${Math.max(5, 15 - metrics.pending * 2)} mins`;
@@ -269,6 +290,7 @@ const ProviderDashboard = () => {
       serviceType: nextUser.serviceType || 'electrical',
       city: nextUser.city || '',
       bio: nextUser.bio || '',
+      price: nextUser.price || '',
       availability:
           typeof nextUser.availability === 'boolean'
               ? nextUser.availability
@@ -281,12 +303,14 @@ const ProviderDashboard = () => {
   const saveProfile = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name is required');
+    if (!form.city.trim()) return toast.error('City is required');
     if (form.phone.length !== 10) return toast.error('Phone must be 10 digits');
     setSaving(true);
     try {
       const res = await api.put('/api/auth/profile', {
         id: form.id, name: form.name.trim(), phone: form.phone,
         serviceType: form.serviceType, city: form.city.trim(), bio: form.bio.trim(),
+        price: form.price ? Number(form.price) : null,
         availability: form.availability,
       });
       syncStoredUser(res.data.user);
@@ -328,9 +352,10 @@ const ProviderDashboard = () => {
     try {
       await api.put(`/api/bookings/${id}/status`, { status });
       setBookings((current) => current.map((b) => (b.id === id ? { ...b, status } : b)));
-      toast.success(status === 'CONFIRMED' ? 'Booking confirmed' : 'Booking declined');
-    } catch {
-      toast.error('Failed to update booking');
+      toast.success(status === 'CONFIRMED' ? 'Booking confirmed' : status === 'COMPLETED' ? 'Marked as complete' : 'Booking declined');
+    } catch (err) {
+      const msg = err.response?.data;
+      toast.error(typeof msg === 'string' ? msg : `Error ${err.response?.status || ''}`);
     } finally {
       setActiveBookingId(null);
     }
@@ -350,7 +375,12 @@ const ProviderDashboard = () => {
                 <div><p className="text-2xl font-black text-white">ServiceMate</p><p className="text-sm text-slate-400">{labels[form.serviceType] || 'General'} provider workspace</p></div>
               </div>
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => { setActivePanel((current) => { const next = current === 'notifications' ? null : 'notifications'; if (next === 'notifications') markProviderRead(); return next; }); }} className={`relative rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300 ${activePanel === 'notifications' ? 'ring-2 ring-sky-400/40' : ''}`}><Bell size={18} />{providerUnread > 0 ? <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-rose-400 text-[10px] font-black text-white">{providerUnread}</span> : null}</button>
+                <div ref={bellProviderRef}>
+                  <button type="button" onClick={openBellProvider} className="relative rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300 transition hover:bg-white/[0.08]">
+                    <Bell size={18} />
+                    {providerUnread > 0 && <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-rose-400 text-[10px] font-black text-white">{providerUnread}</span>}
+                  </button>
+                </div>
                 <div ref={providerProfileRef}>
                   <button type="button" onClick={openProviderProfile} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 transition hover:bg-white/[0.08]">
                     <div><p className="text-sm font-semibold text-white">{form.name || 'Provider'}</p><p className="text-xs text-slate-400">Provider</p></div>
@@ -382,7 +412,7 @@ const ProviderDashboard = () => {
                       <Star size={16} className="text-amber-400" /> Reviews
                     </button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); setProviderView('performance'); setProviderProfileOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]">
-                      <BarChart3 size={16} className="text-emerald-400" /> Performance Overview
+                      <BarChart3 size={16} className="text-emerald-400" /> Analytics
                     </button>
                     <div className="my-1 border-t border-white/10" />
                     <button type="button" onClick={(e) => { e.stopPropagation(); clearSession(); navigate('/login', { replace: true }); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-rose-400 transition hover:bg-rose-500/10">
@@ -395,57 +425,132 @@ const ProviderDashboard = () => {
             document.body
           )}
 
+          {/* Bell notifications portal */}
+          {createPortal(
+            <AnimatePresence>
+              {bellProviderOpen && (
+                <>
+                  <div className="fixed inset-0 z-[9998]" onClick={() => setBellProviderOpen(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ position: 'fixed', top: bellProviderPos.top, right: bellProviderPos.right, zIndex: 9999 }}
+                    className="w-80 rounded-2xl border border-white/10 bg-slate-900 p-3 shadow-2xl backdrop-blur-xl"
+                  >
+                    <div className="mb-3 flex items-center justify-between px-1">
+                      <p className="text-sm font-bold text-white">Notifications</p>
+                      <div className="flex items-center gap-2">
+                        {providerNotifs.length > 0 && (
+                          <button type="button" onClick={() => { clearProviderAll(); setBellProviderOpen(false); }} className="text-xs font-semibold text-cyan-400 transition hover:text-white">Clear all</button>
+                        )}
+                        <button type="button" onClick={() => setBellProviderOpen(false)} className="text-slate-500 hover:text-white"><X size={15} /></button>
+                      </div>
+                    </div>
+                    {providerNotifs.length === 0 ? (
+                      <p className="px-2 py-4 text-center text-sm text-slate-500">No new notifications.</p>
+                    ) : (
+                      <div className="max-h-80 space-y-2 overflow-y-auto">
+                        {providerNotifs.map((n) => (
+                          <div key={n.id} className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm">
+                            <p className="font-semibold text-white">{n.title}</p>
+                            <p className="mt-0.5 text-xs text-slate-300">{n.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>,
+            document.body
+          )}
+
           <AnimatePresence>
             {showProfileOverlay ? (
-                <div
-                    className="fixed inset-0 z-[120] flex items-center justify-center p-4 backdrop-blur-md sm:p-6"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--app-bg) 42%, transparent)' }}
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 backdrop-blur-md sm:p-6"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--app-bg) 42%, transparent)' }}>
+                <motion.section
+                  initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 18, scale: 0.98 }}
+                  className="theme-card w-full max-w-2xl rounded-[34px] p-6 sm:p-8 max-h-[90vh] overflow-y-auto"
                 >
-                  <motion.section
-                      initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 18, scale: 0.98 }}
-                      className="theme-card w-full max-w-lg rounded-[24px] p-4 sm:p-5"
-                  >
-                    <div className="mb-4 flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm uppercase tracking-[0.18em] text-sky-600">Provider Profile</p>
-                        <h2 className="mt-1 text-2xl font-black text-[var(--text-primary)]">{editing ? 'Edit Profile' : 'Public Details'}</h2>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {!editing ? (
-                            <button type="button" onClick={() => setEditing(true)} className="theme-button-secondary rounded-2xl px-4 py-2 text-sm font-semibold">
-                              Edit
-                            </button>
-                        ) : null}
-                        <button
-                            type="button"
-                            onClick={() => { setShowProfileOverlay(false); setEditing(false); }}
-                            className="theme-button-secondary rounded-2xl px-4 py-2 text-sm font-semibold"
-                        >
-                          Close
+                  {/* Header */}
+                  <div className="mb-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-500">Profile</p>
+                      <h2 className="mt-2 text-3xl font-black text-[var(--text-primary)]">Manage Account</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!editing && (
+                        <button type="button" onClick={() => setEditing(true)} className="theme-button-secondary inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold">
+                          <Settings size={15} /> Edit Profile
                         </button>
-                      </div>
+                      )}
+                      <button type="button" onClick={() => { setShowProfileOverlay(false); setEditing(false); }} className="theme-button-secondary rounded-2xl px-4 py-2 text-sm font-semibold">Close</button>
                     </div>
+                  </div>
 
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-[var(--text-primary)] text-xl font-black text-[var(--panel-strong)]">{form.name?.[0] || 'P'}</div>
+                  {/* Avatar */}
+                  <div className="mb-6 flex items-center gap-5">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-3xl font-black text-white">
+                      {form.name?.[0] || 'P'}
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-[var(--text-primary)]">{form.name || 'Service Professional'}</p>
+                      <p className="text-sm text-sky-600">{labels[form.serviceType] || 'General specialist'}</p>
+                      <p className="text-sm text-[var(--text-muted)]">{form.city || 'City not added yet'}</p>
+                    </div>
+                  </div>
+
+                  {editing ? (
+                    <form onSubmit={saveProfile} className="space-y-4">
+                      {[['Full Name', 'name', 'text', ''], ['Phone', 'phone', 'text', '10-digit number'], ['City *', 'city', 'text', 'Your city'], ['Service Price (₹)', 'price', 'number', 'e.g. 499']].map(([label, field, type, placeholder]) => (
+                        <div key={field}>
+                          <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">{label}</label>
+                          <input type={type} min={type === 'number' ? 0 : undefined} value={form[field]} onChange={(e) => setForm((c) => ({ ...c, [field]: field === 'phone' ? e.target.value.replace(/\D/g, '').slice(0, 10) : e.target.value }))} placeholder={placeholder} required={field === 'name' || field === 'city'} disabled={saving} className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-4 py-3 text-[var(--text-primary)] outline-none" />
+                        </div>
+                      ))}
                       <div>
-                        <p className="text-xl font-black text-[var(--text-primary)]">{form.name || 'Service Professional'}</p>
-                        <p className="mt-0.5 text-sm text-sky-600">{labels[form.serviceType] || 'General specialist'}</p>
-                        <p className="mt-0.5 text-sm text-[var(--text-muted)]">{form.city || 'City not added yet'}</p>
+                        <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">Specialty</label>
+                        <select value={form.serviceType} disabled={saving} onChange={(e) => setForm((c) => ({ ...c, serviceType: e.target.value }))} className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-4 py-3 text-[var(--text-primary)] outline-none">
+                          {Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">Bio</label>
+                        <textarea value={form.bio} disabled={saving} onChange={(e) => setForm((c) => ({ ...c, bio: e.target.value }))} rows={3} placeholder="A short bio..." className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-4 py-3 text-[var(--text-primary)] outline-none" />
+                      </div>
+                      <div className="rounded-2xl border p-4" style={{ borderColor: 'color-mix(in srgb, var(--primary-accent) 20%, var(--border-soft))', background: 'color-mix(in srgb, var(--primary-accent) 10%, var(--surface-soft))' }}>
+                        <div className="flex items-center justify-between"><p className="text-sm font-semibold text-[var(--text-primary)]">Profile completion</p><span className="text-xl font-black text-sky-600">{profileCompletion}%</span></div>
+                        <div className="mt-3 h-2 rounded-full bg-[var(--border-soft)]"><div className="theme-progress-fill h-2 rounded-full" style={{ width: `${profileCompletion}%` }} /></div>
+                      </div>
+                      <div className="flex gap-3 pt-2">
+                        <button type="submit" disabled={saving} className="theme-button-primary inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold">
+                          {saving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />} Save Changes
+                        </button>
+                        <button type="button" onClick={() => setEditing(false)} className="theme-button-secondary rounded-2xl px-6 py-3 text-sm font-semibold">Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="space-y-3">
+                      {[['Email', form.email], ['Phone', form.phone || 'Not set'], ['City', form.city || 'Not set'], ['Specialty', labels[form.serviceType] || form.serviceType], ['Service Price', form.price ? `₹ ${form.price}` : 'Not set'], ['Bio', form.bio || 'Not set']].map(([k, v]) => (
+                        <div key={k} className="theme-panel rounded-2xl px-5 py-4">
+                          <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">{k}</p>
+                          <p className="mt-1 text-sm text-[var(--text-primary)]">{v}</p>
+                        </div>
+                      ))}
+                      <div className="rounded-2xl border p-4" style={{ borderColor: 'color-mix(in srgb, var(--primary-accent) 20%, var(--border-soft))', background: 'color-mix(in srgb, var(--primary-accent) 10%, var(--surface-soft))' }}>
+                        <div className="flex items-center justify-between"><p className="text-sm font-semibold text-[var(--text-primary)]">Profile completion</p><span className="text-xl font-black text-sky-600">{profileCompletion}%</span></div>
+                        <div className="mt-3 h-2 rounded-full bg-[var(--border-soft)]"><div className="theme-progress-fill h-2 rounded-full" style={{ width: `${profileCompletion}%` }} /></div>
                       </div>
                     </div>
-
-                    <form onSubmit={saveProfile} className="space-y-3">
-                      {[[Mail, 'email', 'Email', true], [Phone, 'phone', 'Phone', false], [MapPin, 'city', 'City', false]].map(([Icon, key, label, disabled]) => <div key={key} className="rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: 'var(--border-soft)', background: 'var(--surface-soft)', color: 'var(--text-secondary)' }}><div className="mb-1 flex items-center gap-2 text-xs text-[var(--text-muted)]"><Icon size={14} />{label}</div><input value={form[key]} disabled={disabled || !editing || saving} onChange={(e) => setForm((c) => ({ ...c, [key]: key === 'phone' ? e.target.value.replace(/\D/g, '').slice(0, 10) : e.target.value }))} className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none disabled:text-[var(--text-muted)]" /></div>)}
-                      <div className="rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: 'var(--border-soft)', background: 'var(--surface-soft)', color: 'var(--text-secondary)' }}><div className="mb-1 flex items-center gap-2 text-xs text-[var(--text-muted)]"><Settings size={14} />Specialty</div><select value={form.serviceType} disabled={!editing || saving} onChange={(e) => setForm((c) => ({ ...c, serviceType: e.target.value }))} className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none">{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
-                      <div className="rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: 'var(--border-soft)', background: 'var(--surface-soft)', color: 'var(--text-secondary)' }}><div className="mb-1 flex items-center gap-2 text-xs text-[var(--text-muted)]"><MessageSquare size={14} />Bio</div><textarea value={form.bio} disabled={!editing || saving} onChange={(e) => setForm((c) => ({ ...c, bio: e.target.value }))} rows={3} className="w-full resize-none bg-transparent text-sm text-[var(--text-primary)] outline-none disabled:text-[var(--text-muted)]" /></div>
-                      <div className="rounded-2xl border p-3" style={{ borderColor: 'color-mix(in srgb, var(--primary-accent) 20%, var(--border-soft))', background: 'color-mix(in srgb, var(--primary-accent) 10%, var(--surface-soft))' }}><div className="flex items-center justify-between"><p className="text-sm font-semibold text-[var(--text-primary)]">Profile completion</p><span className="text-xl font-black text-sky-600">{profileCompletion}%</span></div><div className="mt-3 h-2 rounded-full bg-white/80"><div className="theme-progress-fill h-2 rounded-full" style={{ width: `${profileCompletion}%` }} /></div></div>
-                      {editing ? <div className="flex flex-wrap gap-2"><button type="submit" disabled={saving} className="theme-button-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-70">{saving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />}Save profile</button><button type="button" onClick={() => setEditing(false)} className="theme-button-secondary rounded-xl px-4 py-2.5 text-sm font-semibold">Cancel</button></div> : null}
-                    </form>
-                  </motion.section>
-                </div>
+                  )}
+                </motion.section>
+              </div>
             ) : null}
           </AnimatePresence>
 
@@ -477,57 +582,75 @@ const ProviderDashboard = () => {
             <section className="rounded-[34px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8">
               <button type="button" onClick={() => setProviderView('dashboard')} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-sky-400"><ArrowLeft size={16} /> Back to dashboard</button>
               <p className="text-sm uppercase tracking-[0.18em] text-emerald-300">Analytics</p>
-              <h2 className="mt-2 text-3xl font-black text-white mb-6">Performance Overview</h2>
-              <div className="grid grid-cols-2 gap-4 mb-8 sm:grid-cols-3">
-                {[['Completed Jobs', metrics.confirmed], ['Total Bookings', metrics.total], ['Pending', metrics.pending], ['Completion Rate', metrics.completion], ['Avg Rating', '4.8'], ['Profile Score', `${profileCompletion}%`]].map(([k, v]) => (
-                  <div key={k} className="rounded-2xl border border-white/10 bg-black/30 p-5">
-                    <p className="text-xs text-slate-400">{k}</p>
-                    <p className="mt-2 text-3xl font-black text-white">{v}</p>
-                  </div>
+              <h2 className="mt-2 text-3xl font-black text-white mb-6">Analytics</h2>
+
+              {/* Tabs */}
+              <div className="mb-6 flex gap-2">
+                {[['thismonth', 'This Month'], ['overview', 'Performance Overview']].map(([tab, label]) => (
+                  <button key={tab} type="button" onClick={() => setAnalyticsTab(tab)}
+                    className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${analyticsTab === tab ? 'bg-white text-slate-950' : 'border border-white/10 bg-white/[0.04] text-slate-400 hover:text-white'}`}>
+                    {label}
+                  </button>
                 ))}
-              </div>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={statsChartData}>
-                    <defs>
-                      <linearGradient id="perfGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#06b6d4" />
-                        <stop offset="100%" stopColor="#a855f7" />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                    <XAxis dataKey="name" stroke="#94a3b8" tick={{ fill: '#cbd5f5', fontSize: 12 }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }} />
-                    <Line type="monotone" dataKey="value" stroke="url(#perfGradient)" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} animationDuration={1200} />
-                  </LineChart>
-                </ResponsiveContainer>
               </div>
 
-              <h3 className="mt-8 text-xl font-black text-white">This Month</h3>
-              <div className="mt-4 h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyData}>
-                    <defs>
-                      <linearGradient id="areaGradient2" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.8}/>
-                        <stop offset="100%" stopColor="#a855f7" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                    <XAxis dataKey="name" stroke="#94a3b8" tick={{ fill: '#cbd5f5', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }} />
-                    <Area type="monotone" dataKey="earnings" stroke="#6366f1" fill="url(#areaGradient2)" strokeWidth={3} animationDuration={1200} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {[['Completed Jobs', metrics.confirmed], ['Hours Worked', metrics.confirmed * 3], ['Avg Response', avgResponseTime], ['Profile Score', `${profileCompletion}%`]].map(([k, v]) => (
-                  <div key={k} className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-xs text-slate-400">{k}</p>
-                    <p className="mt-1 text-2xl font-black text-white">{v}</p>
+              {analyticsTab === 'thismonth' && (
+                <>
+                  <div className="h-56 mb-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={monthlyData}>
+                        <defs>
+                          <linearGradient id="areaGradient2" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.8}/>
+                            <stop offset="100%" stopColor="#a855f7" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                        <XAxis dataKey="name" stroke="#94a3b8" tick={{ fill: '#cbd5f5', fontSize: 11 }} />
+                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }} />
+                        <Area type="monotone" dataKey="earnings" stroke="#6366f1" fill="url(#areaGradient2)" strokeWidth={3} animationDuration={1200} />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[['Completed Jobs', metrics.completed], ['Profile Score', `${profileCompletion}%`]].map(([k, v]) => (
+                      <div key={k} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                        <p className="text-xs text-slate-400">{k}</p>
+                        <p className="mt-1 text-2xl font-black text-white">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {analyticsTab === 'overview' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4 mb-8 sm:grid-cols-3">
+                    {[['Completed Jobs', metrics.completed], ['Total Bookings', metrics.total], ['Pending', metrics.pending], ['Completion Rate', metrics.completion], ['Avg Rating', avgRating], ['Profile Score', `${profileCompletion}%`]].map(([k, v]) => (
+                      <div key={k} className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                        <p className="text-xs text-slate-400">{k}</p>
+                        <p className="mt-2 text-3xl font-black text-white">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={statsChartData}>
+                        <defs>
+                          <linearGradient id="perfGradient" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#06b6d4" />
+                            <stop offset="100%" stopColor="#a855f7" />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                        <XAxis dataKey="name" stroke="#94a3b8" tick={{ fill: '#cbd5f5', fontSize: 12 }} />
+                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }} />
+                        <Line type="monotone" dataKey="value" stroke="url(#perfGradient)" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} animationDuration={1200} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </>
+              )}
             </section>
           )}
 
@@ -595,103 +718,94 @@ const ProviderDashboard = () => {
                 </div>
               </section>
               <section className="overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.04] backdrop-blur-2xl">
-                <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-                  <div><h2 className="text-3xl font-black text-white">Upcoming Bookings</h2><p className="mt-2 text-sm text-slate-400">Manage your scheduled services and respond to new requests.</p></div>
-                  <button
-                      type="button"
-                      onClick={() => setShowAllBookings(!showAllBookings)}
-                      className="rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-950"
-                  >
-                    {showAllBookings ? 'Show Less' : 'View All'}
-                  </button>
+                <div className="border-b border-white/10 px-6 py-6 sm:px-8">
+                  <h2 className="text-3xl font-black text-white">Bookings</h2>
+                  <p className="mt-1 text-sm text-slate-400">Manage incoming requests and confirmed jobs.</p>
+                  <div className="mt-4 flex gap-2">
+                    {[['confirmed', 'Confirmed', bookings.filter(b => b.status === 'CONFIRMED').length], ['pending', 'New Requests', metrics.pending]].map(([tab, label, count]) => (
+                      <button key={tab} type="button" onClick={() => setBookingTab(tab)}
+                        className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${bookingTab === tab ? 'bg-white text-slate-950' : 'border border-white/10 bg-white/[0.04] text-slate-400 hover:text-white'}`}>
+                        {label} {count > 0 && <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${bookingTab === tab ? 'bg-slate-200 text-slate-800' : 'bg-white/10 text-slate-300'}`}>{count}</span>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {loading ? <div className="flex flex-col items-center justify-center px-6 py-20 text-slate-400"><LoaderCircle size={36} className="animate-spin" /><p className="mt-4 text-sm">Loading booking requests...</p></div> : !bookings.length ? <div className="px-6 py-16 text-center"><p className="text-xl font-semibold text-white">No bookings yet</p><p className="mt-2 text-sm text-slate-400">New customer requests will show up in this table.</p></div> : <div className="overflow-x-auto"><table className="min-w-full text-left"><thead className="bg-white/[0.05] text-xs font-bold uppercase tracking-[0.18em] text-slate-400"><tr><th className="px-6 py-4 sm:px-8">Service</th><th className="px-6 py-4">Client</th><th className="px-6 py-4">Date</th><th className="px-6 py-4">Contact</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Action</th></tr></thead>
-                  <tbody>
-                  {displayedBookings.map((b) => {
-                    return (
-                        <tr key={b.id} className="border-t border-white/8 text-sm text-slate-300">
-                          <td className="px-6 py-5 sm:px-8">
-                            <div className="flex flex-col gap-1">
-                              {b.description?.startsWith('[PRIORITY]') && (
-                                <span className="inline-flex w-fit items-center gap-1 rounded-full border border-rose-400/30 bg-rose-400/10 px-2 py-0.5 text-xs font-bold text-rose-300">Priority</span>
-                              )}
-                              <p className="font-semibold text-white">
-                                {b.description?.startsWith('[PRIORITY]') ? b.description.replace('[PRIORITY]', '').trim() : (b.description || 'Customer request')}
-                              </p>
-                            </div>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {labels[form.serviceType] || 'General service'}
-                            </p>
-                          </td>
-
-                          <td className="px-6 py-5">
-                            <p className="font-semibold text-white">
-                              {b.customerName || 'Customer'}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {b.customerCity || 'City unavailable'}
-                            </p>
-                          </td>
-
-                          <td className="px-6 py-5">
-                            <p className="font-semibold text-white">
-                              {b.bookingDate
-                                  ? formatDate(b.bookingDate, {
-                                    year: 'numeric',
-                                    month: '2-digit',
-                                    day: '2-digit',
-                                  })
-                                  : 'Pending'}
-                            </p>
-                          </td>
-
-                          <td className="px-6 py-5">
-                            <p>{b.customerPhone ? `+91 ${b.customerPhone}` : 'Phone unavailable'}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {b.customerEmail || 'Email unavailable'}
-                            </p>
-                          </td>
-
-                          <td className="px-6 py-5">
-          <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                  statusClass[b.status] ||
-                  'border-white/10 bg-white/5 text-slate-200'
-              }`}
-          >
-            {b.status}
-          </span>
-                          </td>
-
-                          <td className="px-6 py-5">
-                            {b.status === 'PENDING' ? (
-                                <div className="flex gap-2">
-                                  <button
-                                      onClick={() => updateStatus(b.id, 'CONFIRMED')}
-                                      className="bg-emerald-400 px-3 py-2 rounded-xl text-black"
-                                  >
-                                    Confirm
-                                  </button>
-                                  <button
-                                      onClick={() => updateStatus(b.id, 'CANCELLED')}
-                                      className="bg-red-400 px-3 py-2 rounded-xl text-black"
-                                  >
-                                    Decline
-                                  </button>
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center px-6 py-20 text-slate-400"><LoaderCircle size={36} className="animate-spin" /><p className="mt-4 text-sm">Loading...</p></div>
+                ) : (() => {
+                  const filtered = bookings.filter(b => bookingTab === 'pending' ? b.status === 'PENDING' : b.status === 'CONFIRMED');
+                  if (!filtered.length) return (
+                    <div className="px-6 py-16 text-center">
+                      <p className="text-lg font-semibold text-white">{bookingTab === 'pending' ? 'No pending requests' : 'No confirmed bookings'}</p>
+                      <p className="mt-2 text-sm text-slate-400">{bookingTab === 'pending' ? 'New customer requests will appear here.' : 'Confirmed jobs will appear here.'}</p>
+                    </div>
+                  );
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left">
+                        <thead className="bg-white/[0.05] text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                          <tr>
+                            <th className="px-6 py-4 sm:px-8">Service</th>
+                            <th className="px-6 py-4">Client</th>
+                            <th className="px-6 py-4">Date</th>
+                            <th className="px-6 py-4">Contact</th>
+                            <th className="px-6 py-4">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.map((b) => (
+                            <tr key={b.id} className="border-t border-white/8 text-sm text-slate-300">
+                              <td className="px-6 py-5 sm:px-8">
+                                <div className="flex flex-col gap-1">
+                                  {b.description?.startsWith('[PRIORITY]') && (
+                                    <span className="inline-flex w-fit rounded-full border border-rose-400/30 bg-rose-400/10 px-2 py-0.5 text-xs font-bold text-rose-300">Priority</span>
+                                  )}
+                                  <p className="font-semibold text-white">
+                                    {b.description?.startsWith('[PRIORITY]') ? b.description.replace('[PRIORITY]', '').trim() : (b.description || 'Customer request')}
+                                  </p>
+                                  <p className="text-xs text-slate-500">{labels[form.serviceType] || 'General service'}</p>
                                 </div>
-                            ) : (
-                                <button
-                                    onClick={() => setSelectedBooking(b)}
-                                    className="text-cyan-400"
-                                >
-                                  View Details
-                                </button>
-                            )}
-                          </td>
-                        </tr>
-                    );
-                  })}
-                  </tbody></table></div>}
+                              </td>
+                              <td className="px-6 py-5">
+                                <p className="font-semibold text-white">{b.customerName || 'Customer'}</p>
+                                <p className="mt-1 text-xs text-slate-500">{b.customerCity || '—'}</p>
+                              </td>
+                              <td className="px-6 py-5 font-semibold text-white">
+                                {b.bookingDate ? formatDate(b.bookingDate, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—'}
+                              </td>
+                              <td className="px-6 py-5">
+                                <p>{b.customerPhone ? `+91 ${b.customerPhone}` : '—'}</p>
+                                <p className="mt-1 text-xs text-slate-500">{b.customerEmail || '—'}</p>
+                              </td>
+                              <td className="px-6 py-5">
+                                {bookingTab === 'pending' ? (
+                                  <div className="flex gap-2">
+                                    <button onClick={() => updateStatus(b.id, 'CONFIRMED')} className="rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-black transition hover:bg-emerald-300">Confirm</button>
+                                    <button onClick={() => updateStatus(b.id, 'CANCELLED')} className="rounded-xl bg-rose-400/20 border border-rose-400/30 px-3 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-400/30">Decline</button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2">
+                                    {(() => {
+                                      const today = new Date(); today.setHours(0,0,0,0);
+                                      const bookingDate = b.bookingDate ? new Date(`${b.bookingDate}T00:00:00`) : null;
+                                      const canComplete = bookingDate && bookingDate <= today;
+                                      return (
+                                        <>
+                                          <button onClick={() => updateStatus(b.id, 'COMPLETED')} disabled={!canComplete} title={!canComplete ? 'Date has not arrived yet' : ''} className="rounded-xl bg-sky-400/20 border border-sky-400/30 px-3 py-2 text-xs font-bold text-sky-300 transition hover:bg-sky-400/30 disabled:opacity-40 disabled:cursor-not-allowed">Mark Complete</button>
+                                          <button onClick={() => setSelectedBooking(b)} className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08]">Details</button>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
               </section>
 
             </div>
